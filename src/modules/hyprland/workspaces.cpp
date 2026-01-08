@@ -1261,9 +1261,12 @@ void Workspaces::applyProjectCollapsing() {
     bool shouldCollapse = m_collapseInactiveProjects && !group.hasActive && group.workspaces.size() > 1;
     bool shouldTransform = m_transformWorkspaceNames;
     
+    // Choose display name based on transform flag
+    std::string displayPrefix = shouldTransform ? cleanPrefix : prefix;
+    
     if (shouldCollapse) {
       // Collapse: hide individual workspaces, show [prefix]
-      spdlog::debug("Workspace group '{}' -> collapsing to [{}]", prefix, cleanPrefix);
+      spdlog::debug("Workspace group '{}' -> collapsing to [{}]", prefix, displayPrefix);
       for (auto* ws : group.workspaces) {
         ws->button().hide();
       }
@@ -1271,7 +1274,7 @@ void Workspaces::applyProjectCollapsing() {
       // Create collapsed button with click handler
       auto collapsedBtn = std::make_unique<Gtk::Button>();
       collapsedBtn->set_relief(Gtk::RELIEF_NONE);
-      collapsedBtn->set_label("[" + cleanPrefix + "]");
+      collapsedBtn->set_label("[" + displayPrefix + "]");
       collapsedBtn->get_style_context()->add_class("collapsed-project");
       collapsedBtn->get_style_context()->add_class(MODULE_CLASS);
       
