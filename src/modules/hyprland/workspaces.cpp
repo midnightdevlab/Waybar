@@ -66,6 +66,13 @@ void Workspaces::createWorkspace(Json::Value const &workspace_data,
                                  Json::Value const &clients_data) {
   auto workspaceName = workspace_data["name"].asString();
   auto workspaceId = workspace_data["id"].asInt();
+  
+  // Skip workspaces with ID 0 (these are workspace rules like "n[s:.]", not real workspaces)
+  if (workspaceId == 0) {
+    spdlog::debug("Workspace '{}' skipped: invalid id {}", workspaceName, workspaceId);
+    return;
+  }
+  
   spdlog::debug("Creating workspace {}", workspaceName);
 
   // avoid recreating existing workspaces
@@ -1157,6 +1164,37 @@ std::optional<std::string> Workspaces::extractProjectPrefix(const std::string& w
   return std::nullopt;
 }
 
+std::string Workspaces::extractNumber(const std::string& workspaceName) {
+  static std::regex pattern(R"([a-zA-Z]+(\d+))");
+  std::smatch match;
+  if (std::regex_search(workspaceName, match, pattern)) {
+    return match[1].str();
+  }
+  return "";
+}
+
+int Workspaces::countWorkspacesInProject(const std::string& prefix) {
+  int count = 0;
+  for (const auto& ws : m_workspaces) {
+    auto wsPrefix = extractProjectPrefix(ws->name());
+    if (wsPrefix && *wsPrefix == prefix) {
+      count++;
+    }
+  }
+  return count;
+}
+
+std::unique_ptr<Gtk::Button> Workspaces::createLabelButton(const std::string& text) {
+  auto btn = std::make_unique<Gtk::Button>();
+  btn->set_label(text);
+  btn->set_relief(Gtk::RELIEF_NONE);
+  btn->set_sensitive(false);  // Non-clickable
+  btn->get_style_context()->add_class("workspace-label");
+  btn->get_style_context()->add_class("grouped");  // For CSS spacing
+  btn->get_style_context()->add_class(MODULE_CLASS);
+  return btn;
+}
+
 void Workspaces::applyProjectCollapsing() {
   if (!m_collapseInactiveProjects) {
     spdlog::debug("Workspace project collapsing disabled");
@@ -1199,36 +1237,100 @@ void Workspaces::applyProjectCollapsing() {
 
   spdlog::debug("Workspace project collapsing: found {} project groups", groups.size());
 
-  // Clear old collapsed buttons
+  // Clear old buttons
   for (auto& btn : m_collapsedButtons) {
     m_box.remove(*btn);
   }
   m_collapsedButtons.clear();
+  
+  for (auto& btn : m_labelButtons) {
+    m_box.remove(*btn);
+  }
+  m_labelButtons.clear();
 
-  // Apply collapsing logic
+  // Apply collapsing logic with enhanced display
   for (auto& [prefix, group] : groups) {
     spdlog::debug("Workspace group '{}': {} workspaces, active={}, firstPos={}", 
                   prefix, group.workspaces.size(), group.hasActive, group.firstPosition);
-                  
-    if (group.hasActive || group.workspaces.size() == 1) {
-      // Show all workspaces normally
-      spdlog::debug("Workspace group '{}' -> showing all workspaces (active or single)", prefix);
+    
+    std::string cleanPrefix = prefix.substr(1);  // Remove leading dot
+    
+    if (group.workspaces.size() == 1) {
+      // Single workspace: show as just prefix name (no number, no brackets)
+      spdlog::debug("Workspace group '{}' -> single workspace, display as '{}'", prefix, cleanPrefix);
+      auto* ws = group.workspaces[0];
+      
+      // Set display name to just the prefix
+      auto& button = ws->button();
+      button.set_label(cleanPrefix);
+      button.show();
+      
+    } else if (group.hasActive) {
+      // Multiple active: show as [prefix num num num]
+      spdlog::debug("Workspace group '{}' -> expanded as [{}...]", prefix, cleanPrefix);
+      
+      int pos = group.firstPosition;
+      
+      // Add opening bracket
+      auto openBracket = createLabelButton("[");
+      m_box.add(*openBracket);
+      m_box.reorder_child(*openBracket, pos++);
+      openBracket->show();
+      m_labelButtons.push_back(std::move(openBracket));
+      
+      // Add project name
+      auto projectLabel = createLabelButton(cleanPrefix);
+      m_box.add(*projectLabel);
+      m_box.reorder_child(*projectLabel, pos++);
+      projectLabel->show();
+      m_labelButtons.push_back(std::move(projectLabel));
+      
+      // Add workspaces (just numbers)
       for (auto* ws : group.workspaces) {
-        ws->button().show();
+        std::string number = extractNumber(ws->name());
+        if (number.empty()) {
+          number = "?";
+        }
+        
+        auto& button = ws->button();
+        button.set_label(number);
+        button.get_style_context()->add_class("grouped");  // For CSS spacing
+        button.show();
+        m_box.reorder_child(button, pos++);
       }
+      
+      // Add closing bracket
+      auto closeBracket = createLabelButton("]");
+      m_box.add(*closeBracket);
+      m_box.reorder_child(*closeBracket, pos);
+      closeBracket->show();
+      m_labelButtons.push_back(std::move(closeBracket));
+      
     } else {
-      // Collapse: hide individual workspaces, show [.prefix]
-      spdlog::debug("Workspace group '{}' -> collapsing to [{}]", prefix, prefix);
+      // Multiple inactive: collapse to [prefix]
+      spdlog::debug("Workspace group '{}' -> collapsing to [{}]", prefix, cleanPrefix);
       for (auto* ws : group.workspaces) {
         ws->button().hide();
       }
       
-      // Create collapsed button
+      // Create collapsed button with click handler
       auto collapsedBtn = std::make_unique<Gtk::Button>();
       collapsedBtn->set_relief(Gtk::RELIEF_NONE);
-      collapsedBtn->set_label("[" + prefix + "]");
+      collapsedBtn->set_label("[" + cleanPrefix + "]");
       collapsedBtn->get_style_context()->add_class("collapsed-project");
       collapsedBtn->get_style_context()->add_class(MODULE_CLASS);
+      
+      // Add click handler to expand and switch to first workspace
+      Workspace* firstWorkspace = group.workspaces[0];
+      collapsedBtn->signal_clicked().connect([this, firstWorkspace]() {
+        try {
+          std::string workspaceName = firstWorkspace->name();
+          spdlog::debug("Workspace collapsed group clicked: switching to {}", workspaceName);
+          m_ipc.getSocket1Reply("dispatch workspace name:" + workspaceName);
+        } catch (const std::exception& e) {
+          spdlog::error("Workspace group click failed: {}", e.what());
+        }
+      });
       
       m_box.add(*collapsedBtn);
       m_box.reorder_child(*collapsedBtn, group.firstPosition);

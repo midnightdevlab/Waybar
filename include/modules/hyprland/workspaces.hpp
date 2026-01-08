@@ -75,6 +75,9 @@ class Workspaces : public AModule, public EventHandler {
   
   // Project collapsing
   std::optional<std::string> extractProjectPrefix(const std::string& workspaceName);
+  std::string extractNumber(const std::string& workspaceName);
+  int countWorkspacesInProject(const std::string& prefix);
+  std::unique_ptr<Gtk::Button> createLabelButton(const std::string& text);
   void applyProjectCollapsing();
 
   static Json::Value createMonitorWorkspaceData(std::string const& name,
@@ -208,6 +211,7 @@ class Workspaces : public AModule, public EventHandler {
   
   // Project collapsing state
   std::vector<std::unique_ptr<Gtk::Button>> m_collapsedButtons;
+  std::vector<std::unique_ptr<Gtk::Button>> m_labelButtons;
 
   std::mutex m_mutex;
   const Bar& m_bar;
