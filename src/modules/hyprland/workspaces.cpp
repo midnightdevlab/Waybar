@@ -368,6 +368,16 @@ void Workspaces::onWorkspaceActivated(std::string const &payload) {
   const auto workspaceId = parseWorkspaceId(workspaceIdStr);
   if (workspaceId.has_value()) {
     m_activeWorkspaceId = *workspaceId;
+    
+    // Track last active workspace per group for collapsed button behavior
+    auto prefix = extractProjectPrefix(workspaceName);
+    if (prefix) {
+      // Build compound key: {prefix}@{monitor}
+      std::string monitor = getBarOutput();
+      std::string key = *prefix + "@" + monitor;
+      m_lastActivePerGroup[key] = workspaceName;
+      spdlog::trace("Tracked last active workspace: {} for key {}", workspaceName, key);
+    }
   }
 }
 
@@ -1283,12 +1293,29 @@ void Workspaces::applyProjectCollapsing() {
       collapsedBtn->get_style_context()->add_class("collapsed-project");
       collapsedBtn->get_style_context()->add_class(MODULE_CLASS);
       
-      // Add click handler to expand and switch to first workspace
+      // Add click handler to expand and switch to last active (or first) workspace
       Workspace* firstWorkspace = group.workspaces[0];
-      collapsedBtn->signal_clicked().connect([this, firstWorkspace]() {
+      std::string groupPrefix = prefix;  // Capture by value
+      collapsedBtn->signal_clicked().connect([this, firstWorkspace, groupPrefix]() {
         try {
-          std::string workspaceName = firstWorkspace->name();
-          spdlog::debug("Workspace collapsed group clicked: switching to {}", workspaceName);
+          // Build compound key for this group+monitor
+          std::string monitor = getBarOutput();
+          std::string key = groupPrefix + "@" + monitor;
+          
+          // Look up last active workspace for this group
+          std::string workspaceName;
+          auto it = m_lastActivePerGroup.find(key);
+          if (it != m_lastActivePerGroup.end()) {
+            workspaceName = it->second;
+            spdlog::debug("Workspace collapsed group '{}' clicked: switching to last active {}", 
+                         groupPrefix, workspaceName);
+          } else {
+            // No history, fall back to first workspace
+            workspaceName = firstWorkspace->name();
+            spdlog::debug("Workspace collapsed group '{}' clicked: no history, switching to first {}", 
+                         groupPrefix, workspaceName);
+          }
+          
           m_ipc.getSocket1Reply("dispatch workspace name:" + workspaceName);
         } catch (const std::exception& e) {
           spdlog::error("Workspace group click failed: {}", e.what());
