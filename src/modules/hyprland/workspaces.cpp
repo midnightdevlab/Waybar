@@ -1251,8 +1251,9 @@ void Workspaces::applyProjectCollapsing() {
   m_labelButtons.clear();
 
   // Apply collapsing/transform logic
+  spdlog::debug("WSDBG: Starting group processing loop, m_box has {} children", m_box.get_children().size());
   for (auto& [prefix, group] : groups) {
-    spdlog::debug("Workspace group '{}': {} workspaces, active={}, firstPos={}", 
+    spdlog::debug("WSDBG: Processing group '{}': {} workspaces, active={}, firstPos={}", 
                   prefix, group.workspaces.size(), group.hasActive, group.firstPosition);
     
     std::string cleanPrefix = prefix.substr(1);  // Remove leading dot
@@ -1270,6 +1271,8 @@ void Workspaces::applyProjectCollapsing() {
       for (auto* ws : group.workspaces) {
         ws->button().hide();
       }
+      
+      spdlog::debug("WSDBG: Before adding collapsed button: m_box has {} children", m_box.get_children().size());
       
       // Create collapsed button with click handler
       auto collapsedBtn = std::make_unique<Gtk::Button>();
@@ -1291,7 +1294,9 @@ void Workspaces::applyProjectCollapsing() {
       });
       
       m_box.add(*collapsedBtn);
+      spdlog::debug("WSDBG: Added collapsed button [{}], now reordering to position {}", displayPrefix, group.firstPosition);
       m_box.reorder_child(*collapsedBtn, group.firstPosition);
+      spdlog::debug("WSDBG: After reorder: m_box has {} children", m_box.get_children().size());
       collapsedBtn->show();
       
       m_collapsedButtons.push_back(std::move(collapsedBtn));
@@ -1313,11 +1318,13 @@ void Workspaces::applyProjectCollapsing() {
         spdlog::debug("Workspace group '{}' -> transformed as [{}...]", prefix, cleanPrefix);
         
         int pos = group.firstPosition;
+        spdlog::debug("WSDBG: Starting transform, pos={}, m_box has {} children", pos, m_box.get_children().size());
         
         // Add opening bracket
         auto openBracket = createLabelButton("[");
         m_box.add(*openBracket);
         m_box.reorder_child(*openBracket, pos++);
+        spdlog::debug("WSDBG: Added '[' at pos {}, m_box now has {} children", pos-1, m_box.get_children().size());
         openBracket->show();
         m_labelButtons.push_back(std::move(openBracket));
         
@@ -1325,6 +1332,7 @@ void Workspaces::applyProjectCollapsing() {
         auto projectLabel = createLabelButton(cleanPrefix);
         m_box.add(*projectLabel);
         m_box.reorder_child(*projectLabel, pos++);
+        spdlog::debug("WSDBG: Added '{}' at pos {}, m_box now has {} children", cleanPrefix, pos-1, m_box.get_children().size());
         projectLabel->show();
         m_labelButtons.push_back(std::move(projectLabel));
         
@@ -1339,13 +1347,16 @@ void Workspaces::applyProjectCollapsing() {
           button.set_label(number);
           button.get_style_context()->add_class("grouped");  // For CSS spacing
           button.show();
-          m_box.reorder_child(button, pos++);
+          m_box.reorder_child(button, pos);
+          spdlog::debug("WSDBG: Reordered workspace '{}' to pos {}", ws->name(), pos);
+          pos++;
         }
         
         // Add closing bracket
         auto closeBracket = createLabelButton("]");
         m_box.add(*closeBracket);
         m_box.reorder_child(*closeBracket, pos);
+        spdlog::debug("WSDBG: Added ']' at pos {}, m_box now has {} children", pos, m_box.get_children().size());
         closeBracket->show();
         m_labelButtons.push_back(std::move(closeBracket));
       }
