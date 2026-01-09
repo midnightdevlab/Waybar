@@ -1220,6 +1220,7 @@ void Workspaces::applyProjectCollapsing() {
     std::string prefix;
     std::vector<Workspace*> workspaces;
     bool hasActive = false;
+    bool hasWindows = false;  // Track if any workspace in group has windows
     int firstPosition = -1;
   };
   
@@ -1239,6 +1240,12 @@ void Workspaces::applyProjectCollapsing() {
       
       if (workspace->isActive()) {
         group.hasActive = true;
+      }
+      
+      // Check if this workspace has windows by checking if it has "empty" CSS class
+      auto styleContext = workspace->button().get_style_context();
+      if (!styleContext->has_class("empty")) {
+        group.hasWindows = true;
       }
       
       if (group.firstPosition == -1) {
@@ -1292,6 +1299,11 @@ void Workspaces::applyProjectCollapsing() {
       collapsedBtn->set_label("[" + displayPrefix + "]");
       collapsedBtn->get_style_context()->add_class("collapsed-project");
       collapsedBtn->get_style_context()->add_class(MODULE_CLASS);
+      
+      // Apply empty class if group has no windows
+      if (!group.hasWindows) {
+        collapsedBtn->get_style_context()->add_class("empty");
+      }
       
       // Add click handler to expand and switch to last active (or first) workspace
       Workspace* firstWorkspace = group.workspaces[0];
