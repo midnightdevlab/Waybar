@@ -213,6 +213,9 @@ class Workspaces : public AModule, public EventHandler {
   // Project collapsing state
   std::vector<std::unique_ptr<Gtk::Button>> m_collapsedButtons;
   std::vector<std::unique_ptr<Gtk::Button>> m_labelButtons;
+  
+  // Track last active workspace per group+monitor for collapsed button clicks
+  std::map<std::string, std::string> m_lastActivePerGroup;
 
   std::mutex m_mutex;
   const Bar& m_bar;
