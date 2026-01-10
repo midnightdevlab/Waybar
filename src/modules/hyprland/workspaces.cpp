@@ -372,11 +372,23 @@ void Workspaces::onWorkspaceActivated(std::string const &payload) {
     // Track last active workspace per group for collapsed button behavior
     auto prefix = extractProjectPrefix(workspaceName);
     if (prefix) {
-      // Build compound key: {prefix}@{monitor}
-      std::string monitor = getBarOutput();
-      std::string key = *prefix + "@" + monitor;
-      m_lastActivePerGroup[key] = workspaceName;
-      spdlog::trace("Tracked last active workspace: {} for key {}", workspaceName, key);
+      // Find the workspace object to get its actual monitor
+      auto workspaceIt = std::find_if(m_workspaces.begin(), m_workspaces.end(),
+                                       [&workspaceName](const auto& ws) {
+                                         return ws->name() == workspaceName;
+                                       });
+      
+      if (workspaceIt != m_workspaces.end()) {
+        // Only track history if workspace is on this bar's monitor
+        std::string workspaceMonitor = (*workspaceIt)->output();
+        std::string barMonitor = getBarOutput();
+        
+        if (workspaceMonitor == barMonitor) {
+          std::string key = *prefix + "@" + barMonitor;
+          m_lastActivePerGroup[key] = workspaceName;
+          spdlog::trace("Tracked last active workspace: {} for key {}", workspaceName, key);
+        }
+      }
     }
   }
 }
