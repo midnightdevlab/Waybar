@@ -1226,6 +1226,9 @@ void Workspaces::applyProjectCollapsing() {
   
   std::map<std::string, ProjectGroup> groups;
   
+  // Get current bar's monitor for filtering
+  std::string currentMonitor = getBarOutput();
+  
   for (size_t i = 0; i < m_workspaces.size(); ++i) {
     auto& workspace = m_workspaces[i];
     auto prefix = extractProjectPrefix(workspace->name());
@@ -1233,7 +1236,8 @@ void Workspaces::applyProjectCollapsing() {
     spdlog::trace("Workspace '{}' -> prefix: {}", workspace->name(), 
                   prefix ? *prefix : "none");
     
-    if (prefix) {
+    // Only include workspaces from current monitor in groups
+    if (prefix && workspace->output() == currentMonitor) {
       auto& group = groups[*prefix];
       group.prefix = *prefix;
       group.workspaces.push_back(workspace.get());
