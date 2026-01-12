@@ -69,24 +69,54 @@ std::optional<WindowRepr> Workspace::closeWindow(WindowAddress const &addr) {
 bool Workspace::handleClicked(GdkEventButton *bt) const {
   if (bt->type == GDK_BUTTON_PRESS) {
     try {
-      if (id() > 0) {  // normal
-        if (m_workspaceManager.moveToMonitor()) {
-          m_ipc.getSocket1Reply("dispatch focusworkspaceoncurrentmonitor " + std::to_string(id()));
+      // Right-click on empty workspace: remove it (even if active)
+      if (bt->button == 3 && isEmpty()) {
+        spdlog::debug("Right-click on empty workspace '{}', attempting to remove", name());
+        std::string cmd = "waybar-workspace-remove.sh " + name();
+        util::command::res result = util::command::exec(cmd, "workspace-remove");
+        if (result.exit_code == 0) {
+          spdlog::info("Removed workspace '{}'", name());
+          return true;
         } else {
-          m_ipc.getSocket1Reply("dispatch workspace " + std::to_string(id()));
+          spdlog::warn("Workspace removal failed: {}", result.out);
+          return false;
         }
-      } else if (!isSpecial()) {  // named (this includes persistent)
-        if (m_workspaceManager.moveToMonitor()) {
-          m_ipc.getSocket1Reply("dispatch focusworkspaceoncurrentmonitor name:" + name());
-        } else {
-          m_ipc.getSocket1Reply("dispatch workspace name:" + name());
-        }
-      } else if (id() != -99) {  // named special
-        m_ipc.getSocket1Reply("dispatch togglespecialworkspace " + name());
-      } else {  // special
-        m_ipc.getSocket1Reply("dispatch togglespecialworkspace");
       }
-      return true;
+      
+      // Left-click on active workspace: create a new workspace for the same project
+      if (bt->button == 1 && isActive()) {
+        spdlog::debug("Active workspace clicked, attempting to create new workspace for project");
+        util::command::res result = util::command::exec("waybar-workspace-create-current.sh", "workspace-create");
+        if (result.exit_code == 0) {
+          spdlog::info("Created new workspace via script");
+          return true;
+        } else {
+          spdlog::warn("Workspace creation script failed: {}", result.out);
+          // Fall through to normal behavior
+        }
+      }
+      
+      // Normal workspace switching behavior (left-click on inactive workspace)
+      if (bt->button == 1) {
+        if (id() > 0) {  // normal
+          if (m_workspaceManager.moveToMonitor()) {
+            m_ipc.getSocket1Reply("dispatch focusworkspaceoncurrentmonitor " + std::to_string(id()));
+          } else {
+            m_ipc.getSocket1Reply("dispatch workspace " + std::to_string(id()));
+          }
+        } else if (!isSpecial()) {  // named (this includes persistent)
+          if (m_workspaceManager.moveToMonitor()) {
+            m_ipc.getSocket1Reply("dispatch focusworkspaceoncurrentmonitor name:" + name());
+          } else {
+            m_ipc.getSocket1Reply("dispatch workspace name:" + name());
+          }
+        } else if (id() != -99) {  // named special
+          m_ipc.getSocket1Reply("dispatch togglespecialworkspace " + name());
+        } else {  // special
+          m_ipc.getSocket1Reply("dispatch togglespecialworkspace");
+        }
+        return true;
+      }
     } catch (const std::exception &e) {
       spdlog::error("Failed to dispatch workspace: {}", e.what());
     }

@@ -1,6 +1,7 @@
 #!/bin/bash
 # Create a new workspace for a project, finding the lowest unused number
-# Shows rofi to select/create project
+# Usage: waybar-workspace-create.sh [PROJECT]
+# If PROJECT is provided, skips rofi and uses that project directly
 
 # Get current active workspace to extract current project
 ACTIVE_WS=$(hyprctl activeworkspace -j | jq -r '.name')
@@ -12,19 +13,25 @@ if [[ "$ACTIVE_WS" =~ ^\.(([a-zA-Z]+)[0-9]) ]]; then
     CURRENT_PROJECT="${BASH_REMATCH[2]}"
 fi
 
-# Get all workspaces and extract unique project prefixes
-ALL_WORKSPACES=$(hyprctl workspaces -j | jq -r '.[].name')
-PROJECTS=$(echo "$ALL_WORKSPACES" | grep -oP '^\.\K[a-zA-Z]+(?=[0-9])' | sort -u)
+# Check if project was provided as parameter
+if [ -n "$1" ]; then
+    SELECTED_PROJECT="$1"
+else
+    # Get all workspaces and extract unique project prefixes
+    ALL_WORKSPACES=$(hyprctl workspaces -j | jq -r '.[].name')
+    PROJECTS=$(echo "$ALL_WORKSPACES" | grep -oP '^\.\K[a-zA-Z]+(?=[0-9])' | sort -u)
 
-# Show rofi to select/create project
-SELECTED_PROJECT=$(echo "$PROJECTS" | rofi -dmenu -p "Project" -select "$CURRENT_PROJECT" -theme-str 'window {width: 400px;} listview {lines: 10;}')
+    # Show rofi to select/create project
+    SELECTED_PROJECT=$(echo "$PROJECTS" | rofi -dmenu -p "Project" -select "$CURRENT_PROJECT" -theme-str 'window {width: 400px;} listview {lines: 10;}')
 
-# Exit if cancelled
-if [ -z "$SELECTED_PROJECT" ]; then
-    exit 0
+    # Exit if cancelled
+    if [ -z "$SELECTED_PROJECT" ]; then
+        exit 0
+    fi
 fi
 
 # Get all workspaces for this project
+ALL_WORKSPACES=$(hyprctl workspaces -j | jq -r '.[].name')
 PROJECT_WORKSPACES=$(echo "$ALL_WORKSPACES" | grep -P "^\.${SELECTED_PROJECT}[0-9]")
 
 # Extract numbers from project workspaces

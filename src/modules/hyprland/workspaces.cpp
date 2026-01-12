@@ -9,6 +9,7 @@
 #include <string>
 #include <utility>
 
+#include "util/command.hpp"
 #include "util/regex_collection.hpp"
 #include "util/string.hpp"
 
@@ -1391,8 +1392,34 @@ void Workspaces::applyProjectCollapsing() {
         openBracket->show();
         m_labelButtons.push_back(std::move(openBracket));
         
-        // Add project name
-        auto projectLabel = createLabelButton(cleanPrefix);
+        // Add project name (make it clickable to create new workspace)
+        auto projectLabel = std::make_unique<Gtk::Button>();
+        projectLabel->set_label(cleanPrefix);
+        projectLabel->set_relief(Gtk::RELIEF_NONE);
+        projectLabel->get_style_context()->add_class("workspace-label");
+        projectLabel->get_style_context()->add_class("grouped");
+        projectLabel->get_style_context()->add_class("empty");  // Use empty style for project labels
+        projectLabel->get_style_context()->add_class(MODULE_CLASS);
+        
+        // Add click handler to create new workspace in this project
+        std::string projectName = cleanPrefix;
+        projectLabel->signal_clicked().connect([this, projectName]() {
+          try {
+            spdlog::debug("Workspace project label '{}' clicked: creating new workspace", projectName);
+            
+            std::string cmd = "waybar-workspace-create.sh " + projectName;
+            util::command::res result = util::command::exec(cmd, "workspace-create");
+            
+            if (result.exit_code == 0) {
+              spdlog::info("Created new workspace for project '{}'", projectName);
+            } else {
+              spdlog::warn("Workspace creation failed: {}", result.out);
+            }
+          } catch (const std::exception& e) {
+            spdlog::error("Workspace project label click failed: {}", e.what());
+          }
+        });
+        
         m_box.add(*projectLabel);
         m_box.reorder_child(*projectLabel, pos++);
         projectLabel->show();
