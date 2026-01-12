@@ -1179,7 +1179,7 @@ std::optional<int> Workspaces::parseWorkspaceId(std::string const &workspaceIdSt
 }
 
 std::optional<std::string> Workspaces::extractProjectPrefix(const std::string& workspaceName) {
-  static std::regex pattern(R"(^\.([a-zA-Z]+)[0-9])");
+  static std::regex pattern(R"(^\.([a-zA-Z0-9]*[a-zA-Z][a-zA-Z0-9]*)\d+)");
   std::smatch match;
   if (std::regex_search(workspaceName, match, pattern)) {
     return "." + match[1].str();
@@ -1188,10 +1188,10 @@ std::optional<std::string> Workspaces::extractProjectPrefix(const std::string& w
 }
 
 std::string Workspaces::extractNumber(const std::string& workspaceName) {
-  static std::regex pattern(R"([a-zA-Z]+(\d+))");
+  static std::regex pattern(R"(([a-zA-Z0-9]*[a-zA-Z][a-zA-Z0-9]*)(\d+))");
   std::smatch match;
   if (std::regex_search(workspaceName, match, pattern)) {
-    return match[1].str();
+    return match[2].str();
   }
   return "";
 }
