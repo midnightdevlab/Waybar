@@ -9,7 +9,7 @@ CURRENT_MONITOR=$(hyprctl monitors -j | jq -r '.[] | select(.focused == true) | 
 
 # Extract current project from active workspace (remove leading dot and number/suffix)
 CURRENT_PROJECT=""
-if [[ "$ACTIVE_WS" =~ ^\.(([a-zA-Z]+)[0-9]) ]]; then
+if [[ "$ACTIVE_WS" =~ ^\.(([a-zA-Z]+)[0-9]+) ]]; then
     CURRENT_PROJECT="${BASH_REMATCH[2]}"
 fi
 
@@ -19,7 +19,7 @@ if [ -n "$1" ]; then
 else
     # Get all workspaces and extract unique project prefixes
     ALL_WORKSPACES=$(hyprctl workspaces -j | jq -r '.[].name')
-    PROJECTS=$(echo "$ALL_WORKSPACES" | grep -oP '^\.\K[a-zA-Z]+(?=[0-9])' | sort -u)
+    PROJECTS=$(echo "$ALL_WORKSPACES" | grep -oP '^\.\K[a-zA-Z]+(?=[0-9]+)' | sort -u)
 
     # Show rofi to select/create project
     SELECTED_PROJECT=$(echo "$PROJECTS" | rofi -dmenu -p "Project" -select "$CURRENT_PROJECT" -theme-str 'window {width: 400px;} listview {lines: 10;}')
@@ -32,7 +32,7 @@ fi
 
 # Get all workspaces for this project
 ALL_WORKSPACES=$(hyprctl workspaces -j | jq -r '.[].name')
-PROJECT_WORKSPACES=$(echo "$ALL_WORKSPACES" | grep -P "^\.${SELECTED_PROJECT}[0-9]")
+PROJECT_WORKSPACES=$(echo "$ALL_WORKSPACES" | grep -P "^\.${SELECTED_PROJECT}[0-9]+")
 
 # Extract numbers from project workspaces
 if [ -z "$PROJECT_WORKSPACES" ]; then

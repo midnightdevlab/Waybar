@@ -5,7 +5,7 @@
 ACTIVE_WS=$(hyprctl activeworkspace -j | jq -r '.name')
 
 # Extract project prefix from workspace name (format: .project0, .project1, etc.)
-if [[ "$ACTIVE_WS" =~ ^\.(([a-zA-Z]+)[0-9]) ]]; then
+if [[ "$ACTIVE_WS" =~ ^\.(([a-zA-Z]+)[0-9]+) ]]; then
     PROJECT="${BASH_REMATCH[2]}"
     
     # Get the directory where this script is located

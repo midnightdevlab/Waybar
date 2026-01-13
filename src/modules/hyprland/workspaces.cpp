@@ -1180,7 +1180,7 @@ std::optional<int> Workspaces::parseWorkspaceId(std::string const &workspaceIdSt
 }
 
 std::optional<std::string> Workspaces::extractProjectPrefix(const std::string& workspaceName) {
-  static std::regex pattern(R"(^\.([a-zA-Z0-9]*[a-zA-Z][a-zA-Z0-9]*)\d+)");
+  static std::regex pattern(R"(^\.(\d*[a-zA-Z]+)\d+)");
   std::smatch match;
   if (std::regex_search(workspaceName, match, pattern)) {
     return "." + match[1].str();
@@ -1189,7 +1189,7 @@ std::optional<std::string> Workspaces::extractProjectPrefix(const std::string& w
 }
 
 std::string Workspaces::extractNumber(const std::string& workspaceName) {
-  static std::regex pattern(R"(([a-zA-Z0-9]*[a-zA-Z][a-zA-Z0-9]*)(\d+))");
+  static std::regex pattern(R"((\d*[a-zA-Z]+)(\d+))");
   std::smatch match;
   if (std::regex_search(workspaceName, match, pattern)) {
     return match[2].str();
@@ -1272,6 +1272,20 @@ void Workspaces::applyProjectCollapsing() {
   }
 
   spdlog::debug("Workspace project features: found {} project groups", groups.size());
+
+  // Sort workspaces within each group numerically by their number
+  for (auto& [prefix, group] : groups) {
+    std::sort(group.workspaces.begin(), group.workspaces.end(),
+              [this](Workspace* a, Workspace* b) {
+                std::string numA = extractNumber(a->name());
+                std::string numB = extractNumber(b->name());
+                try {
+                  return std::stoi(numA) < std::stoi(numB);
+                } catch (...) {
+                  return a->name() < b->name();  // Fallback to name comparison
+                }
+              });
+  }
 
   // Clear old buttons
   for (auto& btn : m_collapsedButtons) {
