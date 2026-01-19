@@ -1502,7 +1502,11 @@ void Workspaces::applyProjectCollapsing() {
           }
           
           auto& button = ws->button();
-          button.set_label(number);
+          // DON'T use button.set_label() - it destroys m_content and icons!
+          // Instead update the label inside the button
+          // button.set_label(number);
+          spdlog::debug("[WICONS] TODO: Update workspace {} label to show '{}'", ws->name(), number);
+          
           button.get_style_context()->add_class("grouped");  // For CSS spacing
           button.show();
           m_box.reorder_child(button, pos++);
