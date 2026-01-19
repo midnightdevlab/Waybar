@@ -143,6 +143,34 @@ void Workspaces::doUpdate() {
 
   bool anyWindowCreated = updateWindowsToCreate();
 
+  // TEST: Add a test button with hardcoded icon at the end
+  static Gtk::Button* testButton = nullptr;
+  static Gtk::Box* testBox = nullptr;
+  static Gtk::Label* testLabel = nullptr;
+  static Gtk::Image* testIcon = nullptr;
+  
+  if (!testButton) {
+    testButton = new Gtk::Button();
+    testBox = new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, 2);
+    testLabel = new Gtk::Label("TEST");
+    testIcon = new Gtk::Image();
+    
+    testIcon->set_pixel_size(16);
+    testIcon->set_from_icon_name("foot", Gtk::ICON_SIZE_INVALID);
+    testIcon->show();
+    
+    testBox->pack_start(*testLabel, false, false);
+    testBox->pack_start(*testIcon, false, false);
+    testBox->show();
+    testLabel->show();
+    
+    testButton->add(*testBox);
+    testButton->show();
+    m_box.pack_end(*testButton, false, false);
+    
+    spdlog::info("[WICONS] TEST: Added test button with foot icon at the end");
+  }
+
   if (anyWindowCreated) {
     dp.emit();
   }
