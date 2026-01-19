@@ -4,12 +4,127 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <set>
+#include <filesystem>
+#include <optional>
+
+#include <gdkmm/pixbuf.h>
+#include <glibmm/fileutils.h>
+#include <glibmm/keyfile.h>
+#include <glibmm/miscutils.h>
 
 #include "modules/hyprland/workspaces.hpp"
 #include "util/command.hpp"
 #include "util/icon_loader.hpp"
+#include "util/gtk_icon.hpp"
 
 namespace waybar::modules::hyprland {
+
+// Helper functions for icon loading (from AAppIconLabel.cpp)
+namespace {
+
+std::string toLowerCase(const std::string& input) {
+  std::string result = input;
+  std::transform(result.begin(), result.end(), result.begin(),
+                 [](unsigned char c) { return std::tolower(c); });
+  return result;
+}
+
+std::optional<std::string> getFileBySuffix(const std::string& dir, const std::string& suffix,
+                                           bool check_lower_case) {
+  if (!std::filesystem::exists(dir)) {
+    return {};
+  }
+  for (const auto& entry : std::filesystem::recursive_directory_iterator(dir)) {
+    if (entry.is_regular_file()) {
+      std::string filename = entry.path().filename().string();
+      if (filename.size() < suffix.size()) {
+        continue;
+      }
+      if ((filename.compare(filename.size() - suffix.size(), suffix.size(), suffix) == 0) ||
+          (check_lower_case && filename.compare(filename.size() - suffix.size(), suffix.size(),
+                                                toLowerCase(suffix)) == 0)) {
+        return entry.path().string();
+      }
+    }
+  }
+  return {};
+}
+
+std::optional<std::string> getDesktopFilePath(const std::string& app_identifier,
+                                              const std::string& alternative_app_identifier) {
+  if (app_identifier.empty()) {
+    return {};
+  }
+
+  auto data_dirs = Glib::get_system_data_dirs();
+  data_dirs.insert(data_dirs.begin(), Glib::get_user_data_dir());
+  for (const auto& data_dir : data_dirs) {
+    const auto data_app_dir = data_dir + "/applications/";
+    auto desktop_file_suffix = app_identifier + ".desktop";
+    auto desktop_file_path = getFileBySuffix(data_app_dir, desktop_file_suffix, true);
+    if (desktop_file_path.has_value()) {
+      return desktop_file_path;
+    }
+    if (!alternative_app_identifier.empty()) {
+      desktop_file_suffix = alternative_app_identifier + ".desktop";
+      desktop_file_path = getFileBySuffix(data_app_dir, desktop_file_suffix, true);
+      if (desktop_file_path.has_value()) {
+        return desktop_file_path;
+      }
+    }
+  }
+  return {};
+}
+
+std::optional<Glib::ustring> getIconName(const std::string& app_identifier,
+                                         const std::string& alternative_app_identifier) {
+  const auto desktop_file_path = getDesktopFilePath(app_identifier, alternative_app_identifier);
+  if (!desktop_file_path.has_value()) {
+    // Try some heuristics to find a matching icon
+    if (DefaultGtkIconThemeWrapper::has_icon(app_identifier)) {
+      return app_identifier;
+    }
+
+    auto app_identifier_desktop = app_identifier + "-desktop";
+    if (DefaultGtkIconThemeWrapper::has_icon(app_identifier_desktop)) {
+      return app_identifier_desktop;
+    }
+
+    auto first_space = app_identifier.find_first_of(' ');
+    if (first_space != std::string::npos) {
+      auto first_word = toLowerCase(app_identifier.substr(0, first_space));
+      if (DefaultGtkIconThemeWrapper::has_icon(first_word)) {
+        return first_word;
+      }
+    }
+
+    const auto first_dash = app_identifier.find_first_of('-');
+    if (first_dash != std::string::npos) {
+      auto first_word = toLowerCase(app_identifier.substr(0, first_dash));
+      if (DefaultGtkIconThemeWrapper::has_icon(first_word)) {
+        return first_word;
+      }
+    }
+
+    return {};
+  }
+
+  try {
+    Glib::KeyFile desktop_file;
+    desktop_file.load_from_file(desktop_file_path.value());
+    return desktop_file.get_string("Desktop Entry", "Icon");
+  } catch (Glib::FileError& error) {
+    spdlog::warn("Error while loading desktop file {}: {}", desktop_file_path.value(),
+                 std::string(error.what()));
+  } catch (Glib::KeyFileError& error) {
+    spdlog::warn("Error while loading desktop file {}: {}", desktop_file_path.value(),
+                 std::string(error.what()));
+  }
+  return {};
+}
+
+} // namespace
 
 Workspace::Workspace(const Json::Value &workspace_data, Workspaces &workspace_manager,
                      const Json::Value &clients_data)
@@ -34,12 +149,14 @@ Workspace::Workspace(const Json::Value &workspace_data, Workspaces &workspace_ma
                                                false);
 
   m_button.set_relief(Gtk::RELIEF_NONE);
+  m_iconBox.set_spacing(2);
   if (m_workspaceManager.enableTaskbar()) {
     m_content.set_orientation(m_workspaceManager.taskbarOrientation());
     m_content.pack_start(m_labelBefore, false, false);
   } else {
     m_content.set_center_widget(m_labelBefore);
   }
+  m_content.pack_end(m_iconBox, false, false);
   m_button.add(m_content);
 
   initializeWindowMap(clients_data);
@@ -295,6 +412,78 @@ void Workspace::update(const std::string &workspace_icon) {
 
   if (m_workspaceManager.enableTaskbar()) {
     updateTaskbar(workspace_icon);
+  }
+  
+  // Render window icons based on configuration
+  updateWindowIcons();
+}
+
+void Workspace::updateWindowIcons() {
+  // Clear existing icons
+  for (auto* img : m_iconImages) {
+    m_iconBox.remove(*img);
+    delete img;
+  }
+  m_iconImages.clear();
+  m_iconBox.hide();
+
+  auto showMode = m_workspaceManager.showWindowIcons();
+  if (showMode == Workspaces::ShowWindowIcons::NONE) {
+    return;
+  }
+
+  // TODO: Implement current-group logic (for now, treat as ALL for active workspace)
+  if (showMode == Workspaces::ShowWindowIcons::CURRENT_GROUP && !isActive()) {
+    return;
+  }
+
+  int icon_size = m_workspaceManager.windowIconSize();
+  
+  // Collect window icons (deduplicate for future collapsed group support)
+  std::set<std::string> unique_icons;
+  std::vector<std::string> icon_names_ordered;
+  
+  for (const auto& window : m_windowMap) {
+    if (shouldSkipWindow(window)) {
+      continue;
+    }
+    
+    auto icon_name_opt = getIconName(window.window_class, "");
+    if (icon_name_opt.has_value()) {
+      std::string icon_name = icon_name_opt.value();
+      if (unique_icons.find(icon_name) == unique_icons.end()) {
+        unique_icons.insert(icon_name);
+        icon_names_ordered.push_back(icon_name);
+      }
+    }
+  }
+
+  // Create and add icon images
+  for (const auto& icon_name : icon_names_ordered) {
+    auto* img = new Gtk::Image();
+    img->set_pixel_size(icon_size);
+    
+    if (icon_name.front() == '/') {
+      // File path - load from file
+      try {
+        auto pixbuf = Gdk::Pixbuf::create_from_file(icon_name, icon_size, icon_size);
+        img->set(pixbuf);
+      } catch (const Glib::Error& e) {
+        spdlog::warn("Failed to load icon from file {}: {}", icon_name, e.what().c_str());
+        continue;
+      }
+    } else {
+      // Icon name - load from theme
+      img->set_from_icon_name(icon_name, Gtk::ICON_SIZE_INVALID);
+    }
+    
+    img->show();
+    m_iconBox.pack_start(*img, false, false);
+    m_iconImages.push_back(img);
+  }
+
+  if (!m_iconImages.empty()) {
+    m_iconBox.show();
   }
 }
 

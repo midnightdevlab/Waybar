@@ -665,6 +665,27 @@ auto Workspaces::parseConfig(const Json::Value &config) -> void {
   populateBoolConfig(config, "collapse-inactive-projects", m_collapseInactiveProjects);
   populateBoolConfig(config, "transform-workspace-names", m_transformWorkspaceNames);
 
+  // Parse show-window-icons config
+  const auto &showWindowIconsConfig = config["show-window-icons"];
+  if (showWindowIconsConfig.isString()) {
+    std::string value = showWindowIconsConfig.asString();
+    if (value == "none") {
+      m_showWindowIcons = ShowWindowIcons::NONE;
+    } else if (value == "current-group") {
+      m_showWindowIcons = ShowWindowIcons::CURRENT_GROUP;
+    } else if (value == "all") {
+      m_showWindowIcons = ShowWindowIcons::ALL;
+    } else {
+      spdlog::warn("Invalid show-window-icons value '{}', using default 'current-group'", value);
+      m_showWindowIcons = ShowWindowIcons::CURRENT_GROUP;
+    }
+  }
+
+  // Parse icon-size config
+  if (config["icon-size"].isInt()) {
+    m_windowIconSize = config["icon-size"].asInt();
+  }
+
   m_persistentWorkspaceConfig = config.get("persistent-workspaces", Json::Value());
   populateSortByConfig(config);
   populateIgnoreWorkspacesConfig(config);

@@ -58,6 +58,10 @@ class Workspaces : public AModule, public EventHandler {
   enum class ActiveWindowPosition { NONE, FIRST, LAST };
   auto activeWindowPosition() const -> ActiveWindowPosition { return m_activeWindowPosition; }
 
+  enum class ShowWindowIcons { NONE, CURRENT_GROUP, ALL };
+  auto showWindowIcons() const -> ShowWindowIcons { return m_showWindowIcons; }
+  auto windowIconSize() const -> int { return m_windowIconSize; }
+
   std::string getRewrite(std::string window_class, std::string window_title);
   std::string& getWindowSeparator() { return m_formatWindowSeparator; }
   bool isWorkspaceIgnored(std::string const& workspace_name);
@@ -206,6 +210,9 @@ class Workspaces : public AModule, public EventHandler {
   };
   std::string m_onClickWindow;
   std::string m_currentActiveWindowAddress;
+
+  ShowWindowIcons m_showWindowIcons = ShowWindowIcons::CURRENT_GROUP;
+  int m_windowIconSize = 16;
 
   std::vector<std::regex> m_ignoreWorkspaces;
   std::vector<std::regex> m_ignoreWindows;
