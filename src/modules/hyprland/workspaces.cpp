@@ -1544,7 +1544,8 @@ void Workspaces::applyProjectCollapsing() {
             eventBox->signal_button_press_event().connect([this, firstWindowAddress](GdkEventButton* event) -> bool {
               if (event->button == 1) {  // Left click
                 spdlog::debug("[WICONS] Collapsed group icon clicked, focusing window: {}", firstWindowAddress);
-                m_ipc.getSocket1Reply("dispatch focuswindow address:" + firstWindowAddress);
+                std::string response = m_ipc.getSocket1Reply("dispatch focuswindow address:" + firstWindowAddress);
+                spdlog::debug("[WICONS] Hyprland response: '{}'", response);
                 return true;
               }
               return false;

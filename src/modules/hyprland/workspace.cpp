@@ -539,7 +539,8 @@ void Workspace::updateWindowIcons() {
       eventBox->signal_button_press_event().connect([this, firstWindowAddress](GdkEventButton* event) -> bool {
         if (event->button == 1) {  // Left click
           spdlog::debug("[WICONS] Icon clicked, focusing window: {}", firstWindowAddress);
-          m_workspaceManager.getIpc().getSocket1Reply("dispatch focuswindow address:" + firstWindowAddress);
+          std::string response = m_workspaceManager.getIpc().getSocket1Reply("dispatch focuswindow address:" + firstWindowAddress);
+          spdlog::debug("[WICONS] Hyprland response: '{}'", response);
           return true;
         }
         return false;
