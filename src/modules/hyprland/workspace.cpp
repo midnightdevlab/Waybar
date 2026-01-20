@@ -24,6 +24,8 @@ namespace waybar::modules::hyprland {
 // Helper function to log GTK widget hierarchy and spacing properties
 namespace {
 
+// Diagnostic logging - kept for future debugging but commented out for now
+/*
 void logGtkSpacingDebug(const std::string& context, const std::string& monitor, 
                        const std::string& workspace_name, int workspace_id,
                        Gtk::Button* button, Gtk::Box* content, Gtk::Label* labelBefore, 
@@ -100,6 +102,7 @@ void logGtkSpacingDebug(const std::string& context, const std::string& monitor,
     }
   }
 }
+*/
 
 std::string toLowerCase(const std::string& input) {
   std::string result = input;
@@ -502,25 +505,25 @@ void Workspace::update(const std::string &workspace_icon) {
   updateWindowIcons();
   
   // Log spacing after update
-  logGtkSpacingDebug("after_update", m_output, m_name, m_id, 
-                     &m_button, &m_content, &m_labelBefore, &m_iconBox);
+  // logGtkSpacingDebug("after_update", m_output, m_name, m_id, 
+  //                    &m_button, &m_content, &m_labelBefore, &m_iconBox);
 }
 
 void Workspace::updateWindowIcons() {
-  logGtkSpacingDebug("before_updateWindowIcons", m_output, m_name, m_id,
-                     &m_button, &m_content, &m_labelBefore, &m_iconBox);
+  // logGtkSpacingDebug("before_updateWindowIcons", m_output, m_name, m_id,
+  //                    &m_button, &m_content, &m_labelBefore, &m_iconBox);
   
   // Diagnostic: log actual IconBox children before cleanup
-  auto children_before = m_iconBox.get_children();
-  spdlog::info("[WS_SPACING] DIAGNOSTIC: m_iconImages.size()={} iconBox.children.size()={}", 
-               m_iconImages.size(), children_before.size());
-  int child_idx = 0;
-  for (auto* child : children_before) {
-    auto alloc = child->get_allocation();
-    const char* type_name = G_OBJECT_TYPE_NAME(child->gobj());
-    spdlog::info("[WS_SPACING] DIAGNOSTIC: child[{}] type='{}' size={}x{}", 
-                 child_idx++, type_name, alloc.get_width(), alloc.get_height());
-  }
+  // auto children_before = m_iconBox.get_children();
+  // spdlog::info("[WS_SPACING] DIAGNOSTIC: m_iconImages.size()={} iconBox.children.size()={}", 
+  //              m_iconImages.size(), children_before.size());
+  // int child_idx = 0;
+  // for (auto* child : children_before) {
+  //   auto alloc = child->get_allocation();
+  //   const char* type_name = G_OBJECT_TYPE_NAME(child->gobj());
+  //   spdlog::info("[WS_SPACING] DIAGNOSTIC: child[{}] type='{}' size={}x{}", 
+  //                child_idx++, type_name, alloc.get_width(), alloc.get_height());
+  // }
   
   // Clear ALL children from IconBox (fixes EventBox accumulation bug)
   // Previous code only removed images from m_iconImages vector but left EventBox containers
@@ -532,16 +535,16 @@ void Workspace::updateWindowIcons() {
   m_iconBox.hide();
   
   // Diagnostic: log actual IconBox children after cleanup
-  auto children_after = m_iconBox.get_children();
-  spdlog::info("[WS_SPACING] DIAGNOSTIC: After cleanup: iconBox.children.size()={}", 
-               children_after.size());
-  child_idx = 0;
-  for (auto* child : children_after) {
-    auto alloc = child->get_allocation();
-    const char* type_name = G_OBJECT_TYPE_NAME(child->gobj());
-    spdlog::info("[WS_SPACING] DIAGNOSTIC: remaining child[{}] type='{}' size={}x{}", 
-                 child_idx++, type_name, alloc.get_width(), alloc.get_height());
-  }
+  // auto children_after = m_iconBox.get_children();
+  // spdlog::info("[WS_SPACING] DIAGNOSTIC: After cleanup: iconBox.children.size()={}", 
+  //              children_after.size());
+  // child_idx = 0;
+  // for (auto* child : children_after) {
+  //   auto alloc = child->get_allocation();
+  //   const char* type_name = G_OBJECT_TYPE_NAME(child->gobj());
+  //   spdlog::info("[WS_SPACING] DIAGNOSTIC: remaining child[{}] type='{}' size={}x{}", 
+  //                child_idx++, type_name, alloc.get_width(), alloc.get_height());
+  // }
 
   auto showMode = m_workspaceManager.showWindowIcons();
   
@@ -656,8 +659,8 @@ void Workspace::updateWindowIcons() {
     m_iconBox.show();
   }
   
-  logGtkSpacingDebug("after_updateWindowIcons", m_output, m_name, m_id,
-                     &m_button, &m_content, &m_labelBefore, &m_iconBox);
+  // logGtkSpacingDebug("after_updateWindowIcons", m_output, m_name, m_id,
+  //                    &m_button, &m_content, &m_labelBefore, &m_iconBox);
 }
 
 bool Workspace::isEmpty() const {
@@ -696,8 +699,8 @@ std::vector<Workspace::WindowInfo> Workspace::getWindows() const {
 }
 
 void Workspace::updateTaskbar(const std::string &workspace_icon) {
-  logGtkSpacingDebug("before_updateTaskbar", m_output, m_name, m_id,
-                     &m_button, &m_content, &m_labelBefore, &m_iconBox);
+  // logGtkSpacingDebug("before_updateTaskbar", m_output, m_name, m_id,
+  //                    &m_button, &m_content, &m_labelBefore, &m_iconBox);
   
   for (auto child : m_content.get_children()) {
     if (child != &m_labelBefore) {
@@ -776,8 +779,8 @@ void Workspace::updateTaskbar(const std::string &workspace_icon) {
     m_labelAfter.show();
   }
   
-  logGtkSpacingDebug("after_updateTaskbar", m_output, m_name, m_id,
-                     &m_button, &m_content, &m_labelBefore, &m_iconBox);
+  // logGtkSpacingDebug("after_updateTaskbar", m_output, m_name, m_id,
+  //                    &m_button, &m_content, &m_labelBefore, &m_iconBox);
 }
 
 bool Workspace::handleClick(const GdkEventButton *event_button, WindowAddress const &addr) const {
