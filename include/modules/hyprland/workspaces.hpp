@@ -58,12 +58,29 @@ class Workspaces : public AModule, public EventHandler {
   enum class ActiveWindowPosition { NONE, FIRST, LAST };
   auto activeWindowPosition() const -> ActiveWindowPosition { return m_activeWindowPosition; }
 
+  enum class ShowWindowIcons { NONE, CURRENT_GROUP, ALL };
+  auto showWindowIcons() const -> ShowWindowIcons { return m_showWindowIcons; }
+  auto windowIconSize() const -> int { return m_windowIconSize; }
+
   std::string getRewrite(std::string window_class, std::string window_title);
   std::string& getWindowSeparator() { return m_formatWindowSeparator; }
   bool isWorkspaceIgnored(std::string const& workspace_name);
 
   bool windowRewriteConfigUsesTitle() const { return m_anyWindowRewriteRuleUsesTitle; }
   const IconLoader& iconLoader() const { return m_iconLoader; }
+  IPC& getIpc() { return m_ipc; }
+  
+  // Helper methods for icon handling
+  struct WindowInfo {
+    std::string windowClass;
+    std::string windowTitle;
+    std::string windowAddress;
+  };
+  
+  std::vector<std::string> getWorkspaceWindowClasses(Workspace* ws);
+  std::vector<WindowInfo> getWorkspaceWindows(Workspace* ws);
+  std::optional<std::string> getIconNameForClass(const std::string& windowClass);
+  bool isWorkspaceInActiveGroup(const std::string& workspaceName);
 
  private:
   void onEvent(const std::string& e) override;
@@ -207,15 +224,26 @@ class Workspaces : public AModule, public EventHandler {
   std::string m_onClickWindow;
   std::string m_currentActiveWindowAddress;
 
+  ShowWindowIcons m_showWindowIcons = ShowWindowIcons::ALL;
+  int m_windowIconSize = 16;
+
   std::vector<std::regex> m_ignoreWorkspaces;
   std::vector<std::regex> m_ignoreWindows;
   
   // Project collapsing state
-  std::vector<std::unique_ptr<Gtk::Button>> m_collapsedButtons;
+  std::vector<Gtk::Box*> m_collapsedGroups;  // Container boxes for collapsed groups
   std::vector<std::unique_ptr<Gtk::Button>> m_labelButtons;
   
   // Track last active workspace per group+monitor for collapsed button clicks
   std::map<std::string, std::string> m_lastActivePerGroup;
+  
+  // Helper method for smart window selection in collapsed icons
+  std::string selectBestWindowForIcon(
+    const std::vector<std::string>& addresses,
+    const std::map<std::string, std::string>& addressToWorkspace,
+    const std::string& groupPrefix,
+    const std::string& monitor
+  );
 
   std::mutex m_mutex;
   const Bar& m_bar;

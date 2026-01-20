@@ -65,6 +65,15 @@ class Workspace {
   std::optional<WindowRepr> closeWindow(WindowAddress const& addr);
 
   void update(const std::string& workspace_icon);
+  void setLabelText(const std::string& text);
+  std::vector<std::string> getWindowClasses() const;
+  
+  struct WindowInfo {
+    std::string windowClass;
+    std::string windowTitle;
+    std::string windowAddress;
+  };
+  std::vector<WindowInfo> getWindows() const;
 
  private:
   Workspaces& m_workspaceManager;
@@ -86,9 +95,12 @@ class Workspace {
   Gtk::Box m_content;
   Gtk::Label m_labelBefore;
   Gtk::Label m_labelAfter;
+  Gtk::Box m_iconBox;
+  std::vector<Gtk::Image*> m_iconImages;
 
   bool isEmpty() const;
   void updateTaskbar(const std::string& workspace_icon);
+  void updateWindowIcons();
   bool handleClick(const GdkEventButton* event_button, WindowAddress const& addr) const;
   bool shouldSkipWindow(const WindowRepr& window_repr) const;
   IPC& m_ipc;
