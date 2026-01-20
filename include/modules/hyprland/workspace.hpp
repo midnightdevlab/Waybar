@@ -71,6 +71,7 @@ class Workspace {
   struct WindowInfo {
     std::string windowClass;
     std::string windowTitle;
+    std::string windowAddress;
   };
   std::vector<WindowInfo> getWindows() const;
 

@@ -1239,7 +1239,7 @@ std::vector<Workspaces::WindowInfo> Workspaces::getWorkspaceWindows(Workspace* w
   auto wsWindows = ws->getWindows();
   std::vector<WindowInfo> result;
   for (const auto& w : wsWindows) {
-    result.push_back({w.windowClass, w.windowTitle});
+    result.push_back({w.windowClass, w.windowTitle, w.windowAddress});
   }
   return result;
 }
@@ -1475,6 +1475,7 @@ void Workspaces::applyProjectCollapsing() {
         std::set<std::string> uniqueIconNames;
         std::vector<std::string> iconNamesOrdered;
         std::map<std::string, std::vector<std::pair<std::string, std::string>>> iconToWorkspaceAndTitles;
+        std::map<std::string, std::vector<std::string>> iconToAddresses;
         
         for (auto* ws : group.workspaces) {
           auto windows = getWorkspaceWindows(ws);
@@ -1488,6 +1489,8 @@ void Workspaces::applyProjectCollapsing() {
               }
               // Collect workspace name and window title for tooltip
               iconToWorkspaceAndTitles[iconName].push_back({ws->name(), window.windowTitle});
+              // Collect window address for click handler
+              iconToAddresses[iconName].push_back(window.windowAddress);
             }
           }
         }
@@ -1528,10 +1531,29 @@ void Workspaces::applyProjectCollapsing() {
               tooltip.pop_back();
             }
           }
-          icon->set_tooltip_text(tooltip);
           
+          // Wrap icon in EventBox to capture clicks
+          auto* eventBox = Gtk::manage(new Gtk::EventBox());
+          eventBox->add(*icon);
+          eventBox->set_tooltip_text(tooltip);
+          
+          // Add click handler to focus the first window
+          const auto& addresses = iconToAddresses[iconName];
+          if (!addresses.empty()) {
+            std::string firstWindowAddress = addresses[0];
+            eventBox->signal_button_press_event().connect([this, firstWindowAddress](GdkEventButton* event) -> bool {
+              if (event->button == 1) {  // Left click
+                spdlog::debug("[WICONS] Collapsed group icon clicked, focusing window: {}", firstWindowAddress);
+                m_ipc.getSocket1Reply("dispatch focuswindow address:" + firstWindowAddress);
+                return true;
+              }
+              return false;
+            });
+          }
+          
+          eventBox->show();
           icon->show();
-          contentBox->pack_start(*icon, false, false);
+          contentBox->pack_start(*eventBox, false, false);
         }
         
         spdlog::debug("[WICONS] Collapsed group '{}' showing {} deduplicated icons", prefix, iconNamesOrdered.size());

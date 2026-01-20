@@ -68,11 +68,13 @@ class Workspaces : public AModule, public EventHandler {
 
   bool windowRewriteConfigUsesTitle() const { return m_anyWindowRewriteRuleUsesTitle; }
   const IconLoader& iconLoader() const { return m_iconLoader; }
+  IPC& getIpc() { return m_ipc; }
   
   // Helper methods for icon handling
   struct WindowInfo {
     std::string windowClass;
     std::string windowTitle;
+    std::string windowAddress;
   };
   
   std::vector<std::string> getWorkspaceWindowClasses(Workspace* ws);

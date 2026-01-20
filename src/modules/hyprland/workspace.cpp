@@ -452,10 +452,11 @@ void Workspace::updateWindowIcons() {
 
   int icon_size = m_workspaceManager.windowIconSize();
   
-  // Collect window icons and their titles (deduplicate icons, collect all titles)
+  // Collect window icons, titles, and addresses (deduplicate icons, collect all data)
   std::set<std::string> unique_icons;
   std::vector<std::string> icon_names_ordered;
   std::map<std::string, std::vector<std::string>> icon_to_titles;
+  std::map<std::string, std::vector<std::string>> icon_to_addresses;
   
   for (const auto& window : m_windowMap) {
     spdlog::debug("[WICONS]   Window: class='{}', title='{}', skip={}", 
@@ -476,8 +477,9 @@ void Workspace::updateWindowIcons() {
         icon_names_ordered.push_back(icon_name);
       }
       
-      // Collect window title for tooltip
+      // Collect window title and address for tooltip and click handler
       icon_to_titles[icon_name].push_back(window.window_title);
+      icon_to_addresses[icon_name].push_back(window.address);
     } else {
       spdlog::debug("[WICONS]     No icon found for class '{}'", window.window_class);
     }
@@ -524,10 +526,29 @@ void Workspace::updateWindowIcons() {
         tooltip.pop_back();
       }
     }
-    img->set_tooltip_text(tooltip);
     
+    // Wrap icon in EventBox to capture clicks
+    auto* eventBox = new Gtk::EventBox();
+    eventBox->add(*img);
+    eventBox->set_tooltip_text(tooltip);
+    
+    // Add click handler to focus the first window
+    const auto& addresses = icon_to_addresses[icon_name];
+    if (!addresses.empty()) {
+      std::string firstWindowAddress = addresses[0];
+      eventBox->signal_button_press_event().connect([this, firstWindowAddress](GdkEventButton* event) -> bool {
+        if (event->button == 1) {  // Left click
+          spdlog::debug("[WICONS] Icon clicked, focusing window: {}", firstWindowAddress);
+          m_workspaceManager.getIpc().getSocket1Reply("dispatch focuswindow address:" + firstWindowAddress);
+          return true;
+        }
+        return false;
+      });
+    }
+    
+    eventBox->show();
     img->show();
-    m_iconBox.pack_start(*img, false, false);
+    m_iconBox.pack_start(*eventBox, false, false);
     m_iconImages.push_back(img);
   }
 
@@ -568,7 +589,7 @@ std::vector<Workspace::WindowInfo> Workspace::getWindows() const {
   std::vector<WindowInfo> windows;
   for (const auto& window : m_windowMap) {
     if (!shouldSkipWindow(window)) {
-      windows.push_back({window.window_class, window.window_title});
+      windows.push_back({window.window_class, window.window_title, window.address});
     }
   }
   return windows;
