@@ -510,6 +510,18 @@ void Workspace::updateWindowIcons() {
   logGtkSpacingDebug("before_updateWindowIcons", m_output, m_name, m_id,
                      &m_button, &m_content, &m_labelBefore, &m_iconBox);
   
+  // Diagnostic: log actual IconBox children before cleanup
+  auto children_before = m_iconBox.get_children();
+  spdlog::info("[WS_SPACING] DIAGNOSTIC: m_iconImages.size()={} iconBox.children.size()={}", 
+               m_iconImages.size(), children_before.size());
+  int child_idx = 0;
+  for (auto* child : children_before) {
+    auto alloc = child->get_allocation();
+    const char* type_name = G_OBJECT_TYPE_NAME(child->gobj());
+    spdlog::info("[WS_SPACING] DIAGNOSTIC: child[{}] type='{}' size={}x{}", 
+                 child_idx++, type_name, alloc.get_width(), alloc.get_height());
+  }
+  
   // Clear existing icons
   for (auto* img : m_iconImages) {
     m_iconBox.remove(*img);
@@ -517,6 +529,18 @@ void Workspace::updateWindowIcons() {
   }
   m_iconImages.clear();
   m_iconBox.hide();
+  
+  // Diagnostic: log actual IconBox children after cleanup
+  auto children_after = m_iconBox.get_children();
+  spdlog::info("[WS_SPACING] DIAGNOSTIC: After cleanup: iconBox.children.size()={}", 
+               children_after.size());
+  child_idx = 0;
+  for (auto* child : children_after) {
+    auto alloc = child->get_allocation();
+    const char* type_name = G_OBJECT_TYPE_NAME(child->gobj());
+    spdlog::info("[WS_SPACING] DIAGNOSTIC: remaining child[{}] type='{}' size={}x{}", 
+                 child_idx++, type_name, alloc.get_width(), alloc.get_height());
+  }
 
   auto showMode = m_workspaceManager.showWindowIcons();
   
