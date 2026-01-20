@@ -17,7 +17,7 @@
 #include "AModule.hpp"
 #include "bar.hpp"
 #include "modules/hyprland/backend.hpp"
-#include "modules/hyprland/windowcreationpayload.hpp"
+#include "modules/hyprland/fancy-windowcreationpayload.hpp"
 #include "util/enum.hpp"
 #include "util/regex_collection.hpp"
 
@@ -25,11 +25,11 @@ using WindowAddress = std::string;
 
 namespace waybar::modules::hyprland {
 
-class Workspaces;
-class Workspace {
+class FancyWorkspaces;
+class FancyWorkspace {
  public:
-  explicit Workspace(const Json::Value& workspace_data, Workspaces& workspace_manager,
-                     const Json::Value& clients_data = Json::Value::nullRef);
+  explicit FancyWorkspace(const Json::Value& workspace_data, FancyWorkspaces& workspace_manager,
+                          const Json::Value& clients_data = Json::Value::nullRef);
   std::string& selectIcon(std::map<std::string, std::string>& icons_map);
   Gtk::Button& button() { return m_button; };
 
@@ -57,17 +57,26 @@ class Workspace {
     return std::ranges::any_of(m_windowMap,
                                [&addr](const auto& window) { return window.address == addr; });
   };
-  void insertWindow(WindowCreationPayload create_window_payload);
+  void insertWindow(FancyWindowCreationPayload create_window_payload);
   void initializeWindowMap(const Json::Value& clients_data);
   void setActiveWindow(WindowAddress const& addr);
 
-  bool onWindowOpened(WindowCreationPayload const& create_window_payload);
-  std::optional<WindowRepr> closeWindow(WindowAddress const& addr);
+  bool onWindowOpened(FancyWindowCreationPayload const& create_window_payload);
+  std::optional<FancyWindowRepr> closeWindow(WindowAddress const& addr);
 
   void update(const std::string& workspace_icon);
+  void setLabelText(const std::string& text);
+  std::vector<std::string> getWindowClasses() const;
+
+  struct WindowInfo {
+    std::string windowClass;
+    std::string windowTitle;
+    std::string windowAddress;
+  };
+  std::vector<WindowInfo> getWindows() const;
 
  private:
-  Workspaces& m_workspaceManager;
+  FancyWorkspaces& m_workspaceManager;
 
   int m_id;
   std::string m_name;
@@ -80,17 +89,20 @@ class Workspace {
   bool m_isUrgent = false;
   bool m_isVisible = false;
 
-  std::vector<WindowRepr> m_windowMap;
+  std::vector<FancyWindowRepr> m_windowMap;
 
   Gtk::Button m_button;
   Gtk::Box m_content;
   Gtk::Label m_labelBefore;
   Gtk::Label m_labelAfter;
+  Gtk::Box m_iconBox;
+  std::vector<Gtk::Image*> m_iconImages;
 
   bool isEmpty() const;
   void updateTaskbar(const std::string& workspace_icon);
+  void updateWindowIcons();
   bool handleClick(const GdkEventButton* event_button, WindowAddress const& addr) const;
-  bool shouldSkipWindow(const WindowRepr& window_repr) const;
+  bool shouldSkipWindow(const FancyWindowRepr& window_repr) const;
   IPC& m_ipc;
 };
 

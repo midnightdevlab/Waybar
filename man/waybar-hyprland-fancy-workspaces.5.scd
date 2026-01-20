@@ -1,16 +1,16 @@
-waybar-hyprland-workspaces(5)
+waybar-hyprland-fancy-workspaces(5)
 
 # NAME
 
-waybar - hyprland workspaces module
+waybar - hyprland fancy workspaces module (custom enhanced version)
 
 # DESCRIPTION
 
-The *workspaces* module displays the currently used workspaces in hyprland compositor.
+The *fancy-workspaces* module is a custom enhanced version of the hyprland workspaces module with additional features including project-based grouping, workspace collapsing, window icons, and smart click handlers.
 
 # CONFIGURATION
 
-Addressed by *hyprland/workspaces*
+Addressed by *hyprland/fancy-workspaces*
 
 *format*: ++
 	typeof: string ++
@@ -143,6 +143,16 @@ This setting is ignored if *workspace-taskbar.enable* is set to true.
 	If set to id, workspaces will sort by id.
 	If set to special-centered, workspaces will sort by default with special workspaces in the center.
 	If none of those, workspaces will sort with default behavior.
+
+*collapse-inactive-projects*: ++
+	typeof: bool ++
+	default: false ++
+	If enabled, workspaces from inactive projects will be collapsed into a single representative button showing [.prefix]. Workspaces must follow the naming pattern: .{prefix}{num}{monitor} (e.g., .prj0+, .dev1-, .web2|). Projects are identified by the letter prefix before the first digit. For example, .prj0+ and .prj1+ belong to project ".prj", while .dev0+ belongs to project ".dev". When a workspace from a project is active, all workspaces in that project are shown expanded. Inactive projects with multiple workspaces are shown as [.prefix]. Single workspaces are never collapsed. Clicking a collapsed group switches to the first workspace in that group.
+
+*transform-workspace-names*: ++
+	typeof: bool ++
+	default: false ++
+	If enabled, workspace names are transformed for cleaner display. Single workspaces show only the project name (e.g., .prj0 → prj). Multiple workspaces in a project are shown with bracket notation (e.g., .prj0 .prj1 .prj2 → [prj 0 1 2]) where only the numbers are clickable workspace buttons. Works independently of collapse-inactive-projects, allowing name transformation without collapsing.
 
 *expand*: ++
 	typeof: bool ++

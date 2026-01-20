@@ -8,6 +8,7 @@
 #include <string>
 
 #include "modules/hyprland/workspaces.hpp"
+#include "modules/hyprland/fancy-workspaces.hpp"
 #include "util/string.hpp"
 
 namespace waybar::util {
@@ -42,6 +43,8 @@ EnumType EnumParser<EnumType>::parseStringToEnum(const std::string& str,
 // Add explicit instantiations for all relevant EnumType types
 template struct EnumParser<modules::hyprland::Workspaces::SortMethod>;
 template struct EnumParser<modules::hyprland::Workspaces::ActiveWindowPosition>;
+template struct EnumParser<modules::hyprland::FancyWorkspaces::SortMethod>;
+template struct EnumParser<modules::hyprland::FancyWorkspaces::ActiveWindowPosition>;
 template struct EnumParser<util::KillSignalAction>;
 
 }  // namespace waybar::util

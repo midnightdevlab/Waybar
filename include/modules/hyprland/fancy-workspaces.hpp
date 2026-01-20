@@ -17,7 +17,7 @@
 #include "bar.hpp"
 #include "modules/hyprland/backend.hpp"
 #include "modules/hyprland/windowcreationpayload.hpp"
-#include "modules/hyprland/workspace.hpp"
+#include "modules/hyprland/fancy-workspace.hpp"
 #include "util/enum.hpp"
 #include "util/icon_loader.hpp"
 #include "util/regex_collection.hpp"
@@ -26,12 +26,13 @@ using WindowAddress = std::string;
 
 namespace waybar::modules::hyprland {
 
-class Workspaces;
+class FancyWorkspace;
+class FancyWorkspaces;
 
-class Workspaces : public AModule, public EventHandler {
+class FancyWorkspaces : public AModule, public EventHandler {
  public:
-  Workspaces(const std::string&, const waybar::Bar&, const Json::Value&);
-  ~Workspaces() override;
+  FancyWorkspaces(const std::string&, const waybar::Bar&, const Json::Value&);
+  ~FancyWorkspaces() override;
   void update() override;
   void init();
 
@@ -58,12 +59,29 @@ class Workspaces : public AModule, public EventHandler {
   enum class ActiveWindowPosition { NONE, FIRST, LAST };
   auto activeWindowPosition() const -> ActiveWindowPosition { return m_activeWindowPosition; }
 
+  enum class ShowWindowIcons { NONE, CURRENT_GROUP, ALL };
+  auto showWindowIcons() const -> ShowWindowIcons { return m_showWindowIcons; }
+  auto windowIconSize() const -> int { return m_windowIconSize; }
+
   std::string getRewrite(std::string window_class, std::string window_title);
   std::string& getWindowSeparator() { return m_formatWindowSeparator; }
   bool isWorkspaceIgnored(std::string const& workspace_name);
 
   bool windowRewriteConfigUsesTitle() const { return m_anyWindowRewriteRuleUsesTitle; }
   const IconLoader& iconLoader() const { return m_iconLoader; }
+  IPC& getIpc() { return m_ipc; }
+  
+  // Helper methods for icon handling
+  struct WindowInfo {
+    std::string windowClass;
+    std::string windowTitle;
+    std::string windowAddress;
+  };
+  
+  std::vector<std::string> getWorkspaceWindowClasses(FancyWorkspace* ws);
+  std::vector<WindowInfo> getWorkspaceWindows(FancyWorkspace* ws);
+  std::optional<std::string> getIconNameForClass(const std::string& windowClass);
+  bool isWorkspaceInActiveGroup(const std::string& workspaceName);
 
  private:
   void onEvent(const std::string& e) override;
@@ -72,6 +90,13 @@ class Workspaces : public AModule, public EventHandler {
   void sortWorkspaces();
   void createWorkspace(Json::Value const& workspace_data,
                        Json::Value const& clients_data = Json::Value::nullRef);
+  
+  // Project collapsing
+  std::optional<std::string> extractProjectPrefix(const std::string& workspaceName);
+  std::string extractNumber(const std::string& workspaceName);
+  int countWorkspacesInProject(const std::string& prefix);
+  std::unique_ptr<Gtk::Button> createLabelButton(const std::string& text);
+  void applyProjectCollapsing();
 
   static Json::Value createMonitorWorkspaceData(std::string const& name,
                                                 std::string const& monitor);
@@ -132,7 +157,7 @@ class Workspaces : public AModule, public EventHandler {
   bool updateWindowsToCreate();
 
   void extendOrphans(int workspaceId, Json::Value const& clientsJson);
-  void registerOrphanWindow(WindowCreationPayload create_window_payload);
+  void registerOrphanWindow(FancyWindowCreationPayload create_window_payload);
 
   void initializeWorkspaces();
   void setCurrentMonitorId();
@@ -145,12 +170,14 @@ class Workspaces : public AModule, public EventHandler {
   bool m_specialVisibleOnly = false;
   bool m_persistentOnly = false;
   bool m_moveToMonitor = false;
+  bool m_collapseInactiveProjects = false;
+  bool m_transformWorkspaceNames = false;
   Json::Value m_persistentWorkspaceConfig;
 
   // Map for windows stored in workspaces not present in the current bar.
   // This happens when the user has multiple monitors (hence, multiple bars)
   // and doesn't share windows across bars (a.k.a `all-outputs` = false)
-  std::map<WindowAddress, WindowRepr, std::less<>> m_orphanWindowMap;
+  std::map<WindowAddress, FancyWindowRepr, std::less<>> m_orphanWindowMap;
 
   enum class SortMethod { ID, NAME, NUMBER, SPECIAL_CENTERED, DEFAULT };
   util::EnumParser<SortMethod> m_enumParser;
@@ -173,10 +200,10 @@ class Workspaces : public AModule, public EventHandler {
   uint64_t m_monitorId;
   int m_activeWorkspaceId;
   std::string m_activeSpecialWorkspaceName;
-  std::vector<std::unique_ptr<Workspace>> m_workspaces;
+  std::vector<std::unique_ptr<FancyWorkspace>> m_workspaces;
   std::vector<std::pair<Json::Value, Json::Value>> m_workspacesToCreate;
   std::vector<std::string> m_workspacesToRemove;
-  std::vector<WindowCreationPayload> m_windowsToCreate;
+  std::vector<FancyWindowCreationPayload> m_windowsToCreate;
 
   IconLoader m_iconLoader;
   bool m_enableTaskbar = false;
@@ -198,8 +225,26 @@ class Workspaces : public AModule, public EventHandler {
   std::string m_onClickWindow;
   std::string m_currentActiveWindowAddress;
 
+  ShowWindowIcons m_showWindowIcons = ShowWindowIcons::ALL;
+  int m_windowIconSize = 16;
+
   std::vector<std::regex> m_ignoreWorkspaces;
   std::vector<std::regex> m_ignoreWindows;
+  
+  // Project collapsing state
+  std::vector<Gtk::Box*> m_collapsedGroups;  // Container boxes for collapsed groups
+  std::vector<std::unique_ptr<Gtk::Button>> m_labelButtons;
+  
+  // Track last active workspace per group+monitor for collapsed button clicks
+  std::map<std::string, std::string> m_lastActivePerGroup;
+  
+  // Helper method for smart window selection in collapsed icons
+  std::string selectBestWindowForIcon(
+    const std::vector<std::string>& addresses,
+    const std::map<std::string, std::string>& addressToWorkspace,
+    const std::string& groupPrefix,
+    const std::string& monitor
+  );
 
   std::mutex m_mutex;
   const Bar& m_bar;
