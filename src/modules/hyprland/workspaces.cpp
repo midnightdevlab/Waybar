@@ -683,12 +683,12 @@ auto Workspaces::parseConfig(const Json::Value &config) -> void {
     } else if (value == "all") {
       m_showWindowIcons = ShowWindowIcons::ALL;
     } else {
-      spdlog::warn("[WICONS] Invalid show-window-icons value '{}', using default 'current-group'", value);
+      spdlog::warn("[WICONS] Invalid show-window-icons value '{}', using default 'all'", value);
       m_showWindowIcons = ShowWindowIcons::CURRENT_GROUP;
     }
     spdlog::info("[WICONS] Window icons config: show-window-icons='{}' (mode={})", value, static_cast<int>(m_showWindowIcons));
   } else {
-    spdlog::info("[WICONS] Window icons config: show-window-icons not set, using default 'current-group' (mode={})", static_cast<int>(m_showWindowIcons));
+    spdlog::info("[WICONS] Window icons config: show-window-icons not set, using default 'all' (mode={})", static_cast<int>(m_showWindowIcons));
   }
 
   // Parse icon-size config

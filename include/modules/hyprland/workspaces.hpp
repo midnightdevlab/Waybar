@@ -222,7 +222,7 @@ class Workspaces : public AModule, public EventHandler {
   std::string m_onClickWindow;
   std::string m_currentActiveWindowAddress;
 
-  ShowWindowIcons m_showWindowIcons = ShowWindowIcons::CURRENT_GROUP;
+  ShowWindowIcons m_showWindowIcons = ShowWindowIcons::ALL;
   int m_windowIconSize = 16;
 
   std::vector<std::regex> m_ignoreWorkspaces;
