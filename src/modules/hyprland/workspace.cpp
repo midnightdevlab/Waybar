@@ -522,10 +522,11 @@ void Workspace::updateWindowIcons() {
                  child_idx++, type_name, alloc.get_width(), alloc.get_height());
   }
   
-  // Clear existing icons
-  for (auto* img : m_iconImages) {
-    m_iconBox.remove(*img);
-    delete img;
+  // Clear ALL children from IconBox (fixes EventBox accumulation bug)
+  // Previous code only removed images from m_iconImages vector but left EventBox containers
+  for (auto* child : m_iconBox.get_children()) {
+    m_iconBox.remove(*child);
+    delete child;
   }
   m_iconImages.clear();
   m_iconBox.hide();
