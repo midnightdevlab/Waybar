@@ -231,11 +231,19 @@ class Workspaces : public AModule, public EventHandler {
   std::vector<std::regex> m_ignoreWindows;
   
   // Project collapsing state
-  std::vector<std::unique_ptr<Gtk::Button>> m_collapsedButtons;
+  std::vector<Gtk::Box*> m_collapsedGroups;  // Container boxes for collapsed groups
   std::vector<std::unique_ptr<Gtk::Button>> m_labelButtons;
   
   // Track last active workspace per group+monitor for collapsed button clicks
   std::map<std::string, std::string> m_lastActivePerGroup;
+  
+  // Helper method for smart window selection in collapsed icons
+  std::string selectBestWindowForIcon(
+    const std::vector<std::string>& addresses,
+    const std::map<std::string, std::string>& addressToWorkspace,
+    const std::string& groupPrefix,
+    const std::string& monitor
+  );
 
   std::mutex m_mutex;
   const Bar& m_bar;

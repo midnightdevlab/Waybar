@@ -1348,6 +1348,46 @@ std::unique_ptr<Gtk::Button> Workspaces::createLabelButton(const std::string& te
   return btn;
 }
 
+std::string Workspaces::selectBestWindowForIcon(
+  const std::vector<std::string>& addresses,
+  const std::map<std::string, std::string>& addressToWorkspace,
+  const std::string& groupPrefix,
+  const std::string& monitor
+) {
+  if (addresses.empty()) {
+    spdlog::error("[ICON_CLICK] No addresses provided");
+    return "";
+  }
+  
+  // Build key for last active lookup
+  std::string key = groupPrefix + "@" + monitor;
+  
+  // Try to find last active workspace
+  auto it = m_lastActivePerGroup.find(key);
+  if (it != m_lastActivePerGroup.end()) {
+    std::string lastActiveWs = it->second;
+    
+    // Look for a window in that workspace
+    for (const auto& addr : addresses) {
+      auto wsIt = addressToWorkspace.find(addr);
+      if (wsIt != addressToWorkspace.end() && wsIt->second == lastActiveWs) {
+        spdlog::info("[ICON_CLICK] Found window in last active workspace '{}': {}", 
+                     lastActiveWs, addr);
+        return addr;
+      }
+    }
+    
+    spdlog::debug("[ICON_CLICK] No window in last active workspace '{}', using first", 
+                  lastActiveWs);
+  } else {
+    spdlog::debug("[ICON_CLICK] No last active workspace for group '{}', using first", 
+                  groupPrefix);
+  }
+  
+  // Fallback: return first window
+  return addresses[0];
+}
+
 void Workspaces::applyProjectCollapsing() {
   // Check if any feature is enabled
   if (!m_collapseInactiveProjects && !m_transformWorkspaceNames) {
@@ -1416,11 +1456,11 @@ void Workspaces::applyProjectCollapsing() {
               });
   }
 
-  // Clear old buttons
-  for (auto& btn : m_collapsedButtons) {
-    m_box.remove(*btn);
+  // Clear old collapsed groups
+  for (auto* groupBox : m_collapsedGroups) {
+    m_box.remove(*groupBox);
   }
-  m_collapsedButtons.clear();
+  m_collapsedGroups.clear();
   
   for (auto& btn : m_labelButtons) {
     m_box.remove(*btn);
@@ -1445,30 +1485,59 @@ void Workspaces::applyProjectCollapsing() {
     int elementsAdded = 0;
     
     if (shouldCollapse) {
-      // Collapse: hide individual workspaces, show [prefix] with icons
+      // Collapse: hide individual workspaces, show [prefix] with icons as sibling buttons
       spdlog::debug("Workspace group '{}' -> collapsing to [{}]", prefix, displayPrefix);
       for (auto* ws : group.workspaces) {
         ws->button().hide();
       }
       
-      spdlog::debug("WSDBG: Before adding collapsed button: m_box has {} children", m_box.get_children().size());
+      // Create container box for the group (not a button!)
+      auto* groupBox = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, 0));
+      groupBox->get_style_context()->add_class("collapsed-project");  // Backward compat
+      groupBox->get_style_context()->add_class("collapsed-project-group");
       
-      // Create collapsed button with content box for label + icons
-      auto collapsedBtn = std::make_unique<Gtk::Button>();
-      collapsedBtn->set_relief(Gtk::RELIEF_NONE);
-      collapsedBtn->get_style_context()->add_class("collapsed-project");
-      collapsedBtn->get_style_context()->add_class(MODULE_CLASS);
+      // Create label button: [prefix]
+      auto* labelBtn = Gtk::manage(new Gtk::Button());
+      labelBtn->set_relief(Gtk::RELIEF_NONE);
+      labelBtn->get_style_context()->add_class("collapsed-project-label");
+      labelBtn->get_style_context()->add_class(MODULE_CLASS);
+      labelBtn->set_label("[" + displayPrefix + "]");
       
-      // Create content: [ + prefix + icons ]
-      auto* contentBox = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_HORIZONTAL, 2));
-      auto* openBracket = Gtk::manage(new Gtk::Label("["));
-      contentBox->pack_start(*openBracket, false, false);
-      openBracket->show();
+      // Add click handler for label - switches to workspace
+      Workspace* firstWorkspace = group.workspaces[0];
+      std::string groupPrefix = prefix;  // Capture by value
+      labelBtn->signal_clicked().connect([this, firstWorkspace, groupPrefix]() {
+        try {
+          // Build compound key for this group+monitor
+          std::string monitor = getBarOutput();
+          std::string key = groupPrefix + "@" + monitor;
+          
+          // Look up last active workspace for this group
+          std::string workspaceName;
+          auto it = m_lastActivePerGroup.find(key);
+          if (it != m_lastActivePerGroup.end()) {
+            workspaceName = it->second;
+            spdlog::debug("Workspace collapsed label '{}' clicked: switching to last active {}", 
+                         groupPrefix, workspaceName);
+          } else {
+            // No history, fall back to first workspace
+            workspaceName = firstWorkspace->name();
+            spdlog::debug("Workspace collapsed label '{}' clicked: no history, switching to first {}", 
+                         groupPrefix, workspaceName);
+          }
+          
+          m_ipc.getSocket1Reply("dispatch workspace name:" + workspaceName);
+        } catch (const std::exception& e) {
+          spdlog::error("Workspace group label click failed: {}", e.what());
+        }
+      });
       
-      // Add prefix first
-      auto* prefixLabel = Gtk::manage(new Gtk::Label(displayPrefix));
-      contentBox->pack_start(*prefixLabel, false, false);
-      prefixLabel->show();
+      // Apply empty class if group has no windows
+      if (!group.hasWindows) {
+        labelBtn->get_style_context()->add_class("empty");
+      }
+      
+      groupBox->pack_start(*labelBtn, false, false);
       
       // Collect and deduplicate icons from all workspaces in this group
       if (m_showWindowIcons == ShowWindowIcons::ALL) {
@@ -1476,6 +1545,7 @@ void Workspaces::applyProjectCollapsing() {
         std::vector<std::string> iconNamesOrdered;
         std::map<std::string, std::vector<std::pair<std::string, std::string>>> iconToWorkspaceAndTitles;
         std::map<std::string, std::vector<std::string>> iconToAddresses;
+        std::map<std::string, std::string> addressToWorkspace;  // For smart selection
         
         for (auto* ws : group.workspaces) {
           auto windows = getWorkspaceWindows(ws);
@@ -1491,12 +1561,19 @@ void Workspaces::applyProjectCollapsing() {
               iconToWorkspaceAndTitles[iconName].push_back({ws->name(), window.windowTitle});
               // Collect window address for click handler
               iconToAddresses[iconName].push_back(window.windowAddress);
+              // Map address to workspace for smart selection
+              addressToWorkspace[window.windowAddress] = ws->name();
             }
           }
         }
         
-        // Add icons after prefix, inside brackets
+        // Create icon buttons
         for (const auto& iconName : iconNamesOrdered) {
+          auto* iconBtn = Gtk::manage(new Gtk::Button());
+          iconBtn->set_relief(Gtk::RELIEF_NONE);
+          iconBtn->get_style_context()->add_class("collapsed-project-icon");
+          iconBtn->get_style_context()->add_class(MODULE_CLASS);
+          
           auto* icon = Gtk::manage(new Gtk::Image());
           icon->set_pixel_size(m_windowIconSize);
           
@@ -1506,13 +1583,15 @@ void Workspaces::applyProjectCollapsing() {
               auto pixbuf = Gdk::Pixbuf::create_from_file(iconName, m_windowIconSize, m_windowIconSize);
               icon->set(pixbuf);
             } catch (const Glib::Error& e) {
-              spdlog::warn("[WICONS] Failed to load icon from file {}: {}", iconName, e.what().c_str());
+              spdlog::warn("[ICON_CLICK] Failed to load icon from file {}: {}", iconName, e.what().c_str());
               continue;
             }
           } else {
             // Icon name from theme
             icon->set_from_icon_name(iconName, Gtk::ICON_SIZE_INVALID);
           }
+          
+          iconBtn->add(*icon);
           
           // Build tooltip from workspace names and window titles
           const auto& workspaceAndTitles = iconToWorkspaceAndTitles[iconName];
@@ -1531,88 +1610,35 @@ void Workspaces::applyProjectCollapsing() {
               tooltip.pop_back();
             }
           }
+          iconBtn->set_tooltip_text(tooltip);
           
-          // Wrap icon in EventBox to capture clicks
-          auto* eventBox = Gtk::manage(new Gtk::EventBox());
-          eventBox->add(*icon);
-          eventBox->set_tooltip_text(tooltip);
+          // Add click handler for icon - smart window focus
+          std::vector<std::string> allAddresses = iconToAddresses[iconName];
+          std::map<std::string, std::string> addrToWs = addressToWorkspace;
+          iconBtn->signal_clicked().connect([this, allAddresses, addrToWs, groupPrefix, iconName]() {
+            std::string targetAddress = selectBestWindowForIcon(
+              allAddresses, addrToWs, groupPrefix, getBarOutput()
+            );
+            if (!targetAddress.empty()) {
+              spdlog::info("[ICON_CLICK] Icon '{}' clicked, focusing window: {}", iconName, targetAddress);
+              m_ipc.getSocket1Reply("dispatch focuswindow address:0x" + targetAddress);
+            }
+          });
           
-          // Add click handler to focus the first window
-          const auto& addresses = iconToAddresses[iconName];
-          if (!addresses.empty()) {
-            std::string firstWindowAddress = addresses[0];
-            // Use button_press_event to intercept before parent button
-            eventBox->signal_button_press_event().connect([this, firstWindowAddress](GdkEventButton* event) -> bool {
-              if (event->button == 1) {  // Left click
-                spdlog::debug("[WICONS] Collapsed icon clicked, focusing window: {}", firstWindowAddress);
-                std::string response = m_ipc.getSocket1Reply("dispatch focuswindow address:0x" + firstWindowAddress);
-                if (response.find("ok") == std::string::npos && !response.empty()) {
-                  spdlog::debug("[WICONS] Hyprland response: '{}'", response);
-                }
-                return true;  // Stop propagation to parent button
-              }
-              return false;
-            });
-          }
-          
-          eventBox->show();
-          icon->show();
-          contentBox->pack_start(*eventBox, false, false);
+          groupBox->pack_start(*iconBtn, false, false);
         }
       }
-      
-      // Add closing bracket
-      auto* closeBracket = Gtk::manage(new Gtk::Label("]"));
-      contentBox->pack_start(*closeBracket, false, false);
-      closeBracket->show();
-      
-      contentBox->show();
-      collapsedBtn->add(*contentBox);
-      
-      // Apply empty class if group has no windows
-      if (!group.hasWindows) {
-        collapsedBtn->get_style_context()->add_class("empty");
-      }
-      
-      // Add click handler to expand and switch to last active (or first) workspace
-      Workspace* firstWorkspace = group.workspaces[0];
-      std::string groupPrefix = prefix;  // Capture by value
-      collapsedBtn->signal_clicked().connect([this, firstWorkspace, groupPrefix]() {
-        try {
-          // Build compound key for this group+monitor
-          std::string monitor = getBarOutput();
-          std::string key = groupPrefix + "@" + monitor;
-          
-          // Look up last active workspace for this group
-          std::string workspaceName;
-          auto it = m_lastActivePerGroup.find(key);
-          if (it != m_lastActivePerGroup.end()) {
-            workspaceName = it->second;
-            spdlog::debug("Workspace collapsed group '{}' clicked: switching to last active {}", 
-                         groupPrefix, workspaceName);
-          } else {
-            // No history, fall back to first workspace
-            workspaceName = firstWorkspace->name();
-            spdlog::debug("Workspace collapsed group '{}' clicked: no history, switching to first {}", 
-                         groupPrefix, workspaceName);
-          }
-          
-          m_ipc.getSocket1Reply("dispatch workspace name:" + workspaceName);
-        } catch (const std::exception& e) {
-          spdlog::error("Workspace group click failed: {}", e.what());
-        }
-      });
       
       // Calculate adjusted position accounting for elements added by earlier groups
       int targetPosition = group.firstPosition + positionOffset;
       
-      m_box.add(*collapsedBtn);
-      m_box.reorder_child(*collapsedBtn, targetPosition);
-      collapsedBtn->show();
+      m_box.add(*groupBox);
+      m_box.reorder_child(*groupBox, targetPosition);
+      groupBox->show_all();
       
-      m_collapsedButtons.push_back(std::move(collapsedBtn));
+      m_collapsedGroups.push_back(groupBox);
       
-      // Collapsed group adds 1 button (workspaces are hidden)
+      // Collapsed group adds 1 element (the groupBox)
       elementsAdded = 1;
       
     } else if (shouldTransform) {
