@@ -1,0 +1,77 @@
+before:
+
+_TS_ monitor='DP-2' ws='.wb6' id=-1376 context='before_updateWindowIcons'
+  Button: size=70x30 margin=(0,0,0,0) padding=(3,3,0,0)
+  Content: size=60x26 spacing=0 margin=(0,0,0,0) padding=(0,0,0,0)
+  Label: size=18x26 text='.wb6' margin=(0,0,0,0) padding=(1,1,0,0)
+  IconBox: size=42x26 spacing=2 visible=true icons=2 margin=(0,0,0,0) padding=(0,0,0,0)
+    Icon[0]: size=20x26
+    Icon[1]: size=20x26
+DIAGNOSTIC: m_iconImages.size()=2 iconBox.children.size()=2
+DIAGNOSTIC: child[0] type='gtkmm__GtkEventBox' size=20x26
+DIAGNOSTIC: child[1] type='gtkmm__GtkEventBox' size=20x26
+DIAGNOSTIC: After cleanup: iconBox.children.size()=2
+DIAGNOSTIC: remaining child[0] type='gtkmm__GtkEventBox' size=20x26
+DIAGNOSTIC: remaining child[1] type='gtkmm__GtkEventBox' size=20x26
+_TS_ monitor='DP-2' ws='.wb6' id=-1376 context='after_updateWindowIcons'
+  Button: size=70x30 margin=(0,0,0,0) padding=(3,3,0,0)
+  Content: size=60x26 spacing=0 margin=(0,0,0,0) padding=(0,0,0,0)
+  Label: size=18x26 text='.wb6' margin=(0,0,0,0) padding=(1,1,0,0)
+  IconBox: size=42x26 spacing=2 visible=true icons=4 margin=(0,0,0,0) padding=(0,0,0,0)
+    Icon[0]: size=20x26
+    Icon[1]: size=20x26
+    Icon[2]: size=1x1
+    Icon[3]: size=1x1
+_TS_ monitor='DP-2' ws='.wb6' id=-1376 context='after_update'
+  Button: size=70x30 margin=(0,0,0,0) padding=(3,3,0,0)
+  Content: size=60x26 spacing=0 margin=(0,0,0,0) padding=(0,0,0,0)
+  Label: size=18x26 text='.wb6' margin=(0,0,0,0) padding=(1,1,0,0)
+  IconBox: size=42x26 spacing=2 visible=true icons=4 margin=(0,0,0,0) padding=(0,0,0,0)
+    Icon[0]: size=20x26
+    Icon[1]: size=20x26
+    Icon[2]: size=1x1
+    Icon[3]: size=1x1
+
+after:
+
+_TS_ monitor='DP-2' ws='.wb6' id=-1376 context='before_updateWindowIcons'
+  Button: size=74x30 margin=(0,0,0,0) padding=(3,3,0,0)
+  Content: size=64x26 spacing=0 margin=(0,0,0,0) padding=(0,0,0,0)
+  Label: size=18x26 text='.wb6' margin=(0,0,0,0) padding=(1,1,0,0)
+  IconBox: size=46x26 spacing=2 visible=true icons=4 margin=(0,0,0,0) padding=(0,0,0,0)
+    Icon[0]: size=1x26
+    Icon[1]: size=1x26
+    Icon[2]: size=20x26
+    Icon[3]: size=20x26
+DIAGNOSTIC: m_iconImages.size()=2 iconBox.children.size()=4
+DIAGNOSTIC: child[0] type='gtkmm__GtkEventBox' size=1x26
+DIAGNOSTIC: child[1] type='gtkmm__GtkEventBox' size=1x26
+DIAGNOSTIC: child[2] type='gtkmm__GtkEventBox' size=20x26
+DIAGNOSTIC: child[3] type='gtkmm__GtkEventBox' size=20x26
+DIAGNOSTIC: After cleanup: iconBox.children.size()=4
+DIAGNOSTIC: remaining child[0] type='gtkmm__GtkEventBox' size=1x26
+DIAGNOSTIC: remaining child[1] type='gtkmm__GtkEventBox' size=1x26
+DIAGNOSTIC: remaining child[2] type='gtkmm__GtkEventBox' size=20x26
+DIAGNOSTIC: remaining child[3] type='gtkmm__GtkEventBox' size=20x26
+_TS_ monitor='DP-2' ws='.wb6' id=-1376 context='after_updateWindowIcons'
+  Button: size=74x30 margin=(0,0,0,0) padding=(3,3,0,0)
+  Content: size=64x26 spacing=0 margin=(0,0,0,0) padding=(0,0,0,0)
+  Label: size=18x26 text='.wb6' margin=(0,0,0,0) padding=(1,1,0,0)
+  IconBox: size=46x26 spacing=2 visible=true icons=6 margin=(0,0,0,0) padding=(0,0,0,0)
+    Icon[0]: size=1x26
+    Icon[1]: size=1x26
+    Icon[2]: size=20x26
+    Icon[3]: size=20x26
+    Icon[4]: size=1x1
+    Icon[5]: size=1x1
+_TS_ monitor='DP-2' ws='.wb6' id=-1376 context='after_update'
+  Button: size=74x30 margin=(0,0,0,0) padding=(3,3,0,0)
+  Content: size=64x26 spacing=0 margin=(0,0,0,0) padding=(0,0,0,0)
+  Label: size=18x26 text='.wb6' margin=(0,0,0,0) padding=(1,1,0,0)
+  IconBox: size=46x26 spacing=2 visible=true icons=6 margin=(0,0,0,0) padding=(0,0,0,0)
+    Icon[0]: size=1x26
+    Icon[1]: size=1x26
+    Icon[2]: size=20x26
+    Icon[3]: size=20x26
+    Icon[4]: size=1x1
+    Icon[5]: size=1x1

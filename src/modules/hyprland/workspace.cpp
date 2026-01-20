@@ -7,6 +7,7 @@
 #include <set>
 #include <filesystem>
 #include <optional>
+#include <chrono>
 
 #include <gdkmm/pixbuf.h>
 #include <glibmm/fileutils.h>
@@ -20,8 +21,88 @@
 
 namespace waybar::modules::hyprland {
 
-// Helper functions for icon loading (from AAppIconLabel.cpp)
+// Helper function to log GTK widget hierarchy and spacing properties
 namespace {
+
+// Diagnostic logging - kept for future debugging but commented out for now
+/*
+void logGtkSpacingDebug(const std::string& context, const std::string& monitor, 
+                       const std::string& workspace_name, int workspace_id,
+                       Gtk::Button* button, Gtk::Box* content, Gtk::Label* labelBefore, 
+                       Gtk::Box* iconBox) {
+  auto now = std::chrono::system_clock::now();
+  auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+      now.time_since_epoch()).count();
+  
+  // Get allocation sizes
+  auto button_alloc = button->get_allocation();
+  auto content_alloc = content->get_allocation();
+  auto label_alloc = labelBefore->get_allocation();
+  auto iconbox_alloc = iconBox->get_allocation();
+  
+  // Get spacing properties
+  int content_spacing = content->get_spacing();
+  int iconbox_spacing = iconBox->get_spacing();
+  
+  // Get border/margin/padding
+  auto button_ctx = button->get_style_context();
+  auto content_ctx = content->get_style_context();
+  auto label_ctx = labelBefore->get_style_context();
+  auto iconbox_ctx = iconBox->get_style_context();
+  
+  Gtk::Border button_margin = button_ctx->get_margin(button_ctx->get_state());
+  Gtk::Border button_padding = button_ctx->get_padding(button_ctx->get_state());
+  Gtk::Border content_margin = content_ctx->get_margin(content_ctx->get_state());
+  Gtk::Border content_padding = content_ctx->get_padding(content_ctx->get_state());
+  Gtk::Border label_margin = label_ctx->get_margin(label_ctx->get_state());
+  Gtk::Border label_padding = label_ctx->get_padding(label_ctx->get_state());
+  Gtk::Border iconbox_margin = iconbox_ctx->get_margin(iconbox_ctx->get_state());
+  Gtk::Border iconbox_padding = iconbox_ctx->get_padding(iconbox_ctx->get_state());
+  
+  // Count children
+  auto iconbox_children = iconBox->get_children();
+  int icon_count = iconbox_children.size();
+  
+  spdlog::info("[WS_SPACING] ts={} monitor='{}' ws='{}' id={} context='{}'", 
+               timestamp, monitor, workspace_name, workspace_id, context);
+  spdlog::info("[WS_SPACING]   Button: size={}x{} margin=({},{},{},{}) padding=({},{},{},{})",
+               button_alloc.get_width(), button_alloc.get_height(),
+               button_margin.get_left(), button_margin.get_right(), 
+               button_margin.get_top(), button_margin.get_bottom(),
+               button_padding.get_left(), button_padding.get_right(),
+               button_padding.get_top(), button_padding.get_bottom());
+  spdlog::info("[WS_SPACING]   Content: size={}x{} spacing={} margin=({},{},{},{}) padding=({},{},{},{})",
+               content_alloc.get_width(), content_alloc.get_height(), content_spacing,
+               content_margin.get_left(), content_margin.get_right(),
+               content_margin.get_top(), content_margin.get_bottom(),
+               content_padding.get_left(), content_padding.get_right(),
+               content_padding.get_top(), content_padding.get_bottom());
+  spdlog::info("[WS_SPACING]   Label: size={}x{} text='{}' margin=({},{},{},{}) padding=({},{},{},{})",
+               label_alloc.get_width(), label_alloc.get_height(), 
+               std::string(labelBefore->get_text()),
+               label_margin.get_left(), label_margin.get_right(),
+               label_margin.get_top(), label_margin.get_bottom(),
+               label_padding.get_left(), label_padding.get_right(),
+               label_padding.get_top(), label_padding.get_bottom());
+  spdlog::info("[WS_SPACING]   IconBox: size={}x{} spacing={} visible={} icons={} margin=({},{},{},{}) padding=({},{},{},{})",
+               iconbox_alloc.get_width(), iconbox_alloc.get_height(), 
+               iconbox_spacing, iconBox->get_visible(), icon_count,
+               iconbox_margin.get_left(), iconbox_margin.get_right(),
+               iconbox_margin.get_top(), iconbox_margin.get_bottom(),
+               iconbox_padding.get_left(), iconbox_padding.get_right(),
+               iconbox_padding.get_top(), iconbox_padding.get_bottom());
+  
+  // Log individual icon sizes if present
+  if (icon_count > 0) {
+    int idx = 0;
+    for (auto* child : iconbox_children) {
+      auto child_alloc = child->get_allocation();
+      spdlog::info("[WS_SPACING]     Icon[{}]: size={}x{}", idx++,
+                   child_alloc.get_width(), child_alloc.get_height());
+    }
+  }
+}
+*/
 
 std::string toLowerCase(const std::string& input) {
   std::string result = input;
@@ -422,16 +503,48 @@ void Workspace::update(const std::string &workspace_icon) {
   
   // Render window icons based on configuration
   updateWindowIcons();
+  
+  // Log spacing after update
+  // logGtkSpacingDebug("after_update", m_output, m_name, m_id, 
+  //                    &m_button, &m_content, &m_labelBefore, &m_iconBox);
 }
 
 void Workspace::updateWindowIcons() {
-  // Clear existing icons
-  for (auto* img : m_iconImages) {
-    m_iconBox.remove(*img);
-    delete img;
+  // logGtkSpacingDebug("before_updateWindowIcons", m_output, m_name, m_id,
+  //                    &m_button, &m_content, &m_labelBefore, &m_iconBox);
+  
+  // Diagnostic: log actual IconBox children before cleanup
+  // auto children_before = m_iconBox.get_children();
+  // spdlog::info("[WS_SPACING] DIAGNOSTIC: m_iconImages.size()={} iconBox.children.size()={}", 
+  //              m_iconImages.size(), children_before.size());
+  // int child_idx = 0;
+  // for (auto* child : children_before) {
+  //   auto alloc = child->get_allocation();
+  //   const char* type_name = G_OBJECT_TYPE_NAME(child->gobj());
+  //   spdlog::info("[WS_SPACING] DIAGNOSTIC: child[{}] type='{}' size={}x{}", 
+  //                child_idx++, type_name, alloc.get_width(), alloc.get_height());
+  // }
+  
+  // Clear ALL children from IconBox (fixes EventBox accumulation bug)
+  // Previous code only removed images from m_iconImages vector but left EventBox containers
+  for (auto* child : m_iconBox.get_children()) {
+    m_iconBox.remove(*child);
+    delete child;
   }
   m_iconImages.clear();
   m_iconBox.hide();
+  
+  // Diagnostic: log actual IconBox children after cleanup
+  // auto children_after = m_iconBox.get_children();
+  // spdlog::info("[WS_SPACING] DIAGNOSTIC: After cleanup: iconBox.children.size()={}", 
+  //              children_after.size());
+  // child_idx = 0;
+  // for (auto* child : children_after) {
+  //   auto alloc = child->get_allocation();
+  //   const char* type_name = G_OBJECT_TYPE_NAME(child->gobj());
+  //   spdlog::info("[WS_SPACING] DIAGNOSTIC: remaining child[{}] type='{}' size={}x{}", 
+  //                child_idx++, type_name, alloc.get_width(), alloc.get_height());
+  // }
 
   auto showMode = m_workspaceManager.showWindowIcons();
   
@@ -545,6 +658,9 @@ void Workspace::updateWindowIcons() {
   if (!m_iconImages.empty()) {
     m_iconBox.show();
   }
+  
+  // logGtkSpacingDebug("after_updateWindowIcons", m_output, m_name, m_id,
+  //                    &m_button, &m_content, &m_labelBefore, &m_iconBox);
 }
 
 bool Workspace::isEmpty() const {
@@ -583,6 +699,9 @@ std::vector<Workspace::WindowInfo> Workspace::getWindows() const {
 }
 
 void Workspace::updateTaskbar(const std::string &workspace_icon) {
+  // logGtkSpacingDebug("before_updateTaskbar", m_output, m_name, m_id,
+  //                    &m_button, &m_content, &m_labelBefore, &m_iconBox);
+  
   for (auto child : m_content.get_children()) {
     if (child != &m_labelBefore) {
       m_content.remove(*child);
@@ -659,6 +778,9 @@ void Workspace::updateTaskbar(const std::string &workspace_icon) {
     m_content.pack_end(m_labelAfter, false, false);
     m_labelAfter.show();
   }
+  
+  // logGtkSpacingDebug("after_updateTaskbar", m_output, m_name, m_id,
+  //                    &m_button, &m_content, &m_labelBefore, &m_iconBox);
 }
 
 bool Workspace::handleClick(const GdkEventButton *event_button, WindowAddress const &addr) const {
