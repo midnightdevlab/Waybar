@@ -1067,12 +1067,20 @@ void FancyWorkspaces::sortWorkspaces() {
 void FancyWorkspaces::setUrgentWorkspace(std::string const& windowaddress) {
   const Json::Value clientsJson = m_ipc.getSocket1JsonReply("clients");
   int workspaceId = -1;
+  std::string fullAddress;
 
   for (Json::Value clientJson : clientsJson) {
     if (clientJson["address"].asString().ends_with(windowaddress)) {
       workspaceId = clientJson["workspace"]["id"].asInt();
+      fullAddress = clientJson["address"].asString();
       break;
     }
+  }
+
+  // Track the specific urgent window address
+  if (!fullAddress.empty()) {
+    m_urgentWindows.insert(fullAddress);
+    spdlog::debug("Added urgent window: {}", fullAddress);
   }
 
   auto workspace = std::ranges::find_if(
@@ -1148,8 +1156,27 @@ void FancyWorkspaces::updateWorkspaceStates() {
     workspace->setActive(
         workspace->id() == m_activeWorkspaceId || isActiveByName ||
         (workspace->isSpecial() && workspace->name() == m_activeSpecialWorkspaceName));
+    
+    if (workspace->isActive()) {
+      spdlog::debug("Workspace {} is now active, urgent={}", workspace->name(), workspace->isUrgent());
+    }
+    
     if (workspace->isActive() && workspace->isUrgent()) {
+      spdlog::debug("Clearing urgent for workspace {}", workspace->name());
       workspace->setUrgent(false);
+      // Clear urgent windows for this workspace
+      auto wsWindows = getWorkspaceWindows(workspace.get());
+      for (const auto& window : wsWindows) {
+        // Ensure address has 0x prefix to match what was stored
+        std::string addr = window.windowAddress;
+        if (!addr.starts_with("0x")) {
+          addr = "0x" + addr;
+        }
+        spdlog::debug("Clearing urgent window: {}", addr);
+        auto erased = m_urgentWindows.erase(addr);
+        spdlog::debug("Erased {} (was {}present)", addr, erased ? "" : "NOT ");
+      }
+      spdlog::debug("Urgent windows remaining: {}", m_urgentWindows.size());
     }
     workspace->setVisible(std::ranges::find(visibleWorkspaces, workspace->id()) !=
                           visibleWorkspaces.end());
@@ -1370,10 +1397,26 @@ std::string FancyWorkspaces::selectBestWindowForIcon(
     return "";
   }
 
+  // Priority 1: Check for urgent workspace
+  for (const auto& addr : addresses) {
+    auto wsIt = addressToWorkspace.find(addr);
+    if (wsIt != addressToWorkspace.end()) {
+      // Find workspace by name and check if urgent
+      auto workspace = std::ranges::find_if(
+          m_workspaces, [&wsIt](const std::unique_ptr<FancyWorkspace>& ws) {
+            return ws->name() == wsIt->second;
+          });
+      if (workspace != m_workspaces.end() && workspace->get()->isUrgent()) {
+        spdlog::info("[ICON_CLICK] Found window in urgent workspace '{}': {}", wsIt->second, addr);
+        return addr;
+      }
+    }
+  }
+
   // Build key for last active lookup
   std::string key = groupPrefix + "@" + monitor;
 
-  // Try to find last active workspace
+  // Priority 2: Try to find last active workspace
   auto it = m_lastActivePerGroup.find(key);
   if (it != m_lastActivePerGroup.end()) {
     std::string lastActiveWs = it->second;
@@ -1414,6 +1457,7 @@ void FancyWorkspaces::applyProjectCollapsing() {
     std::vector<FancyWorkspace*> workspaces;
     bool hasActive = false;
     bool hasWindows = false;  // Track if any workspace in group has windows
+    bool hasUrgent = false;   // Track if any workspace in group is urgent
     int firstPosition = -1;
   };
 
@@ -1436,6 +1480,10 @@ void FancyWorkspaces::applyProjectCollapsing() {
 
       if (workspace->isActive()) {
         group.hasActive = true;
+      }
+
+      if (workspace->isUrgent()) {
+        group.hasUrgent = true;
       }
 
       // Check if this workspace has windows by checking if it has "empty" CSS class
@@ -1580,6 +1628,11 @@ void FancyWorkspaces::applyProjectCollapsing() {
         labelBtn->get_style_context()->add_class("empty");
       }
 
+      // Apply urgent class if any workspace in group is urgent
+      if (group.hasUrgent) {
+        labelBtn->get_style_context()->add_class("urgent");
+      }
+
       groupBox->pack_start(*labelBtn, false, false);
 
       // Collect and deduplicate icons from all workspaces in this group
@@ -1657,6 +1710,20 @@ void FancyWorkspaces::applyProjectCollapsing() {
             }
           }
           iconBtn->set_tooltip_text(tooltip);
+
+          // Check if any of this icon's windows are urgent (by address)
+          const auto& iconAddresses = iconToAddresses[iconName];
+          bool hasUrgentWindow = std::ranges::any_of(iconAddresses, [this](const std::string& addr) {
+            bool isUrgent = m_urgentWindows.contains("0x" + addr);
+            if (isUrgent) {
+              spdlog::debug("[ICON_URGENT] Icon address 0x{} is urgent", addr);
+            }
+            return isUrgent;
+          });
+          if (hasUrgentWindow) {
+            spdlog::debug("[ICON_URGENT] Icon '{}' has urgent window, applying class", iconName);
+            iconBtn->get_style_context()->add_class("urgent");
+          }
 
           // Add click handler for icon - smart window focus
           std::vector<std::string> allAddresses = iconToAddresses[iconName];

@@ -10,6 +10,7 @@
 #include <memory>
 #include <optional>
 #include <regex>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -238,6 +239,9 @@ class FancyWorkspaces : public AModule, public EventHandler {
   
   // Track last active workspace per group+monitor for collapsed button clicks
   std::map<std::string, std::string> m_lastActivePerGroup;
+  
+  // Track urgent window addresses for precise urgent styling
+  std::set<std::string> m_urgentWindows;
   
   // Helper method for smart window selection in collapsed icons
   std::string selectBestWindowForIcon(
