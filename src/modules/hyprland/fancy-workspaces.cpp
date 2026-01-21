@@ -1800,6 +1800,9 @@ void FancyWorkspaces::applyProjectCollapsing() {
           // Use setLabelText to update label without destroying icon boxes
           ws->setLabelText(number);
           ws->button().get_style_context()->add_class("grouped");  // For CSS spacing
+          if (group.hasActive) {
+            ws->button().get_style_context()->add_class("active-group");
+          }
           ws->button().show();
           m_box.reorder_child(ws->button(), pos++);
         }
