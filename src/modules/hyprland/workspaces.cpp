@@ -2,6 +2,7 @@
 
 #include <json/value.h>
 #include <spdlog/spdlog.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <memory>
@@ -377,6 +378,11 @@ void Workspaces::onWorkspaceDestroyed(std::string const &payload) {
   const auto [workspaceId, workspaceName] = splitDoublePayload(payload);
   if (!isDoubleSpecial(workspaceName)) {
     m_workspacesToRemove.push_back(workspaceId);
+    
+    // Execute on-workspace-destroyed hook
+    if (!m_onWorkspaceDestroyed.empty()) {
+      executeHook(m_onWorkspaceDestroyed, workspaceName, "", 0);
+    }
   }
 }
 
@@ -418,6 +424,13 @@ void Workspaces::onWorkspaceCreated(std::string const &payload, Json::Value cons
         }
 
         m_workspacesToCreate.emplace_back(workspaceJson, clientsData);
+        
+        // Execute on-workspace-created hook
+        if (!m_onWorkspaceCreated.empty()) {
+          std::string monitor = workspaceJson["monitor"].asString();
+          executeHook(m_onWorkspaceCreated, workspaceName, monitor, currentId);
+        }
+        
         break;
       }
     } else {
@@ -638,6 +651,10 @@ auto Workspaces::parseConfig(const Json::Value &config) -> void {
   populateBoolConfig(config, "move-to-monitor", m_moveToMonitor);
 
   m_persistentWorkspaceConfig = config.get("persistent-workspaces", Json::Value());
+  
+  m_onWorkspaceCreated = config.get("on-workspace-created", "").asString();
+  m_onWorkspaceDestroyed = config.get("on-workspace-destroyed", "").asString();
+  
   populateSortByConfig(config);
   populateIgnoreWorkspacesConfig(config);
   populateFormatWindowSeparatorConfig(config);
@@ -1149,6 +1166,47 @@ std::optional<int> Workspaces::parseWorkspaceId(std::string const &workspaceIdSt
     spdlog::debug("Workspace \"{}\" is not bound to an id: {}", workspaceIdStr, e.what());
     return std::nullopt;
   }
+}
+
+void Workspaces::executeHook(const std::string& command, const std::string& workspaceName,
+                             const std::string& workspaceMonitor, int workspaceId) {
+  if (command.empty()) {
+    return;
+  }
+
+  // Replace variables in command
+  std::string cmd = command;
+  size_t pos = 0;
+  while ((pos = cmd.find("{name}", pos)) != std::string::npos) {
+    cmd.replace(pos, 6, workspaceName);
+    pos += workspaceName.length();
+  }
+  
+  pos = 0;
+  while ((pos = cmd.find("{monitor}", pos)) != std::string::npos) {
+    cmd.replace(pos, 9, workspaceMonitor);
+    pos += workspaceMonitor.length();
+  }
+  
+  pos = 0;
+  std::string idStr = std::to_string(workspaceId);
+  while ((pos = cmd.find("{id}", pos)) != std::string::npos) {
+    cmd.replace(pos, 4, idStr);
+    pos += idStr.length();
+  }
+
+  spdlog::debug("Executing hook: {}", cmd);
+
+  // Fork and execute command asynchronously
+  pid_t pid = fork();
+  if (pid == 0) {
+    // Child process
+    execl("/bin/sh", "sh", "-c", cmd.c_str(), nullptr);
+    _exit(1);
+  } else if (pid < 0) {
+    spdlog::error("Failed to fork process for hook execution");
+  }
+  // Parent continues without waiting
 }
 
 }  // namespace waybar::modules::hyprland
