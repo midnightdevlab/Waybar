@@ -139,6 +139,9 @@ class Workspaces : public AModule, public EventHandler {
   void loadPersistentWorkspacesFromConfig(Json::Value const& clientsJson);
   void loadPersistentWorkspacesFromWorkspaceRules(const Json::Value& clientsJson);
 
+  void executeHook(const std::string& command, const std::string& workspaceName,
+                   const std::string& workspaceMonitor, int workspaceId);
+
   bool m_allOutputs = false;
   bool m_showSpecial = false;
   bool m_activeOnly = false;
@@ -200,6 +203,9 @@ class Workspaces : public AModule, public EventHandler {
 
   std::vector<std::regex> m_ignoreWorkspaces;
   std::vector<std::regex> m_ignoreWindows;
+
+  std::string m_onWorkspaceCreated;
+  std::string m_onWorkspaceDestroyed;
 
   std::mutex m_mutex;
   const Bar& m_bar;
