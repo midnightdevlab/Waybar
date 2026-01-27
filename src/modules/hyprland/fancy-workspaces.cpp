@@ -910,10 +910,10 @@ auto FancyWorkspaces::registerIpc() -> void {
   m_ipc.registerForIPC("urgent", this);
   m_ipc.registerForIPC("configreloaded", this);
 
-  if (windowRewriteConfigUsesTitle() || m_taskbarWithTitle) {
+  if (windowRewriteConfigUsesTitle() || m_taskbarWithTitle || m_showWindowIcons != ShowWindowIcons::NONE) {
     spdlog::info(
-        "Registering for Hyprland's 'windowtitlev2' events because a user-defined window "
-        "rewrite rule uses the 'title' field.");
+        "Registering for Hyprland's 'windowtitlev2' events because window titles are displayed "
+        "(in window rewrite rules, taskbar, or icon tooltips).");
     m_ipc.registerForIPC("windowtitlev2", this);
   }
   if (m_updateActiveWindow) {
