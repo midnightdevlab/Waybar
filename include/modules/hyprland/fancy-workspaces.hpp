@@ -270,9 +270,6 @@ class FancyWorkspaces : public AModule, public EventHandler {
   util::ThumbnailCache m_thumbnailCache;
   void captureThumbnailsForWorkspace(const std::string& workspaceName);
   
-  // Track background capture process to kill it if workspace changes
-  pid_t m_captureProcessPid = 0;
-  
   // Popup daemon IPC client for interactive thumbnails
   util::PopupIPCClient m_popupClient;
 };

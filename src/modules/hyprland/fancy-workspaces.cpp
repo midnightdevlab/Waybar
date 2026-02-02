@@ -7,6 +7,8 @@
 #include <json/value.h>
 #include <spdlog/spdlog.h>
 #include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
 
 #include <algorithm>
 #include <filesystem>
@@ -22,6 +24,12 @@
 
 namespace waybar::modules::hyprland {
 
+static void sigchld_handler(int sig) {
+  int saved_errno = errno;
+  while (waitpid(-1, nullptr, WNOHANG) > 0);
+  errno = saved_errno;
+}
+
 FancyWorkspaces::FancyWorkspaces(const std::string& id, const Bar& bar, const Json::Value& config)
     : AModule(config, "workspaces", id, false, false),
       m_bar(bar),
@@ -35,6 +43,15 @@ FancyWorkspaces::FancyWorkspaces(const std::string& id, const Bar& bar, const Js
   }
   m_box.get_style_context()->add_class(MODULE_CLASS);
   event_box_.add(m_box);
+
+  // Install SIGCHLD handler to reap zombie processes from thumbnail capture forks
+  struct sigaction sa;
+  sa.sa_handler = sigchld_handler;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
+  if (sigaction(SIGCHLD, &sa, nullptr) == -1) {
+    spdlog::error("Failed to install SIGCHLD handler: {}", strerror(errno));
+  }
 
   // Clean up old thumbnail cache on startup
   spdlog::info("Cleaning up thumbnail cache on startup");
@@ -389,8 +406,7 @@ void FancyWorkspaces::onWorkspaceActivated(std::string const& payload) {
   if (workspaceId.has_value()) {
     m_activeWorkspaceId = *workspaceId;
     
-    // No need to kill old capture process - it validates workspace before committing
-    m_captureProcessPid = 0;
+    // Child processes are automatically reaped by SIGCHLD handler
     
     // Start background capture for all windows in this workspace
     auto workspace = std::find_if(m_workspaces.begin(), m_workspaces.end(),
@@ -2123,10 +2139,8 @@ void FancyWorkspaces::captureThumbnailsForWorkspace(const std::string& workspace
     }
     
     _exit(0);
-  } else if (pid > 0) {
-    // Parent: track the PID so we can kill it if needed
-    m_captureProcessPid = pid;
   }
+  // Parent continues immediately - child will be reaped by SIGCHLD handler
 }
 
 }  // namespace waybar::modules::hyprland
