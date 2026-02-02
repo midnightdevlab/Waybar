@@ -73,8 +73,8 @@ public:
     Glib::signal_idle().connect_once([this]() {
       resize(20, 20);  // Tiny size
       
-      // Position offscreen before showing
-      move(-10000, -10000);
+      // Position far below screen (more Hyprland-friendly than negative coords)
+      move(0, 10000);
       
       show_all();
       
@@ -97,8 +97,8 @@ public:
     m_should_show = false;  // Cancel any pending show
     spdlog::debug("[DAEMON] hide() called, m_should_show set to false");
     if (!m_window_address.empty()) {
-      spdlog::debug("[DAEMON] Hiding window (moving to -10000,-10000)");
-      m_hypr_ipc.moveWindow(m_window_address, -10000, -10000);
+      spdlog::debug("[DAEMON] Hiding window (moving to 0,10000 - far below screen)");
+      m_hypr_ipc.moveWindow(m_window_address, 0, 10000);
     }
     // Also resize to tiny
     resize(20, 20);
