@@ -515,6 +515,12 @@ void Workspaces::onWindowOpened(std::string const &payload) {
 
   std::string windowTitle = payload.substr(nextCommaIdx + 1, payload.length() - nextCommaIdx);
 
+  // Filter out waybar's own popup daemon
+  if (windowClass == "waybar-popup-daemon") {
+    spdlog::trace("Ignoring waybar-popup-daemon window");
+    return;
+  }
+
   bool isActive = m_currentActiveWindowAddress == windowAddress;
   m_windowsToCreate.emplace_back(workspaceName, windowAddress, windowClass, windowTitle, isActive);
 }
@@ -1034,6 +1040,8 @@ auto Workspaces::update() -> void {
 
 void Workspaces::updateWindowCount() {
   const Json::Value workspacesJson = m_ipc.getSocket1JsonReply("workspaces");
+  const Json::Value clientsJson = m_ipc.getSocket1JsonReply("clients");
+  
   for (auto const &workspace : m_workspaces) {
     auto workspaceJson = std::ranges::find_if(workspacesJson, [&](Json::Value const &x) {
       return x["name"].asString() == workspace->name() ||
@@ -1042,7 +1050,13 @@ void Workspaces::updateWindowCount() {
     uint32_t count = 0;
     if (workspaceJson != workspacesJson.end()) {
       try {
-        count = (*workspaceJson)["windows"].asUInt();
+        // Count manually from clients, excluding waybar-popup-daemon
+        for (const auto &client : clientsJson) {
+          if (client["workspace"]["name"].asString() == workspace->name() &&
+              client["class"].asString() != "waybar-popup-daemon") {
+            count++;
+          }
+        }
       } catch (const std::exception &e) {
         spdlog::error("Failed to update window count: {}", e.what());
       }

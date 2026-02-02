@@ -98,6 +98,11 @@ void Workspace::initializeWindowMap(const Json::Value &clients_data) {
   m_windowMap.clear();
   for (auto client : clients_data) {
     if (client["workspace"]["id"].asInt() == id()) {
+      // Filter out waybar's own popup daemon
+      std::string clientClass = client["class"].asString();
+      if (clientClass == "waybar-popup-daemon") {
+        continue;
+      }
       insertWindow({client});
     }
   }

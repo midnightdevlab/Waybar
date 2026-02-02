@@ -389,11 +389,8 @@ void FancyWorkspaces::onWorkspaceActivated(std::string const& payload) {
   if (workspaceId.has_value()) {
     m_activeWorkspaceId = *workspaceId;
     
-    // Kill any pending capture process from previous workspace switch
-    if (m_captureProcessPid > 0) {
-      kill(m_captureProcessPid, SIGTERM);
-      m_captureProcessPid = 0;
-    }
+    // No need to kill old capture process - it validates workspace before committing
+    m_captureProcessPid = 0;
     
     // Start background capture for all windows in this workspace
     auto workspace = std::find_if(m_workspaces.begin(), m_workspaces.end(),

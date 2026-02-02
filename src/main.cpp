@@ -10,6 +10,7 @@
 #include "bar.hpp"
 #include "client.hpp"
 #include "util/SafeSignal.hpp"
+#include "util/popup_daemon_manager.hpp"
 
 std::mutex reap_mtx;
 std::list<pid_t> reap;
@@ -50,6 +51,7 @@ static void catchSignals(waybar::SafeSignal<int>& signal_handler) {
   std::signal(SIGUSR1, writeSignalToPipe);
   std::signal(SIGUSR2, writeSignalToPipe);
   std::signal(SIGINT, writeSignalToPipe);
+  std::signal(SIGTERM, writeSignalToPipe);
   std::signal(SIGCHLD, writeSignalToPipe);
 
   for (int sig = SIGRTMIN + 1; sig <= SIGRTMAX; ++sig) {
@@ -131,12 +133,16 @@ static void handleSignalMainThread(int signum, bool& reload) {
       handleUserSignal(SIGUSR2, reload);
       break;
     case SIGINT:
+    case SIGTERM:
       spdlog::info("Quitting.");
+      // Stop popup daemon before resetting client
+      spdlog::info("[PopupDaemon] Stopping due to signal (SIGINT/SIGTERM)");
+      waybar::util::PopupDaemonManager::getInstance().stop();
       reload = false;
       waybar::Client::inst()->reset();
       break;
     case SIGCHLD:
-      spdlog::debug("Received SIGCHLD in signalThread");
+      // spdlog::debug("Received SIGCHLD in signalThread");
       if (!reap.empty()) {
         reap_mtx.lock();
         for (auto it = reap.begin(); it != reap.end(); ++it) {
@@ -157,6 +163,11 @@ static void handleSignalMainThread(int signum, bool& reload) {
 int main(int argc, char* argv[]) {
   try {
     auto* client = waybar::Client::inst();
+    
+    // Ensure daemon cleanup on exit
+    std::atexit([]() {
+      waybar::util::PopupDaemonManager::getInstance().stop();
+    });
 
     bool reload;
 
@@ -178,6 +189,7 @@ int main(int argc, char* argv[]) {
     std::signal(SIGUSR1, SIG_IGN);
     std::signal(SIGUSR2, SIG_IGN);
     std::signal(SIGINT, SIG_IGN);
+    std::signal(SIGTERM, SIG_IGN);
 
     delete client;
     return ret;

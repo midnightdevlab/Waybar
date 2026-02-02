@@ -186,7 +186,9 @@ src_files = files(
     'src/util/icon_loader.cpp',
     'src/util/regex_collection.cpp',
     'src/util/css_reload_helper.cpp',
-    'src/util/thumbnail_cache.cpp'
+    'src/util/thumbnail_cache.cpp',
+    'src/util/popup_daemon_manager.cpp',
+    'src/util/popup_ipc_client.cpp'
 )
 
 man_files = files(
@@ -571,6 +573,38 @@ executable(
     ],
     include_directories: inc_dirs,
     install: true,
+)
+
+# Popup daemon - separate application
+executable(
+    'waybar-popup-daemon',
+    files(
+        'src/waybar-popup-daemon/main.cpp',
+        'src/waybar-popup-daemon/hyprland_ipc.cpp'
+    ),
+    dependencies: [
+        thread_dep,
+        gtkmm,
+        spdlog,
+        jsoncpp,
+    ],
+    include_directories: inc_dirs,
+    install: true,
+)
+
+# Test program for IPC client (not installed)
+executable(
+    'test-popup-ipc',
+    files(
+        'src/test-popup-ipc.cpp',
+        'src/util/popup_ipc_client.cpp'
+    ),
+    dependencies: [
+        spdlog,
+        jsoncpp,
+    ],
+    include_directories: inc_dirs,
+    install: false,
 )
 
 install_data(

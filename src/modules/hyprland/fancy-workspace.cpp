@@ -16,6 +16,7 @@
 #include "util/command.hpp"
 #include "util/gtk_icon.hpp"
 #include "util/icon_loader.hpp"
+#include "util/popup_ipc_client.hpp"
 #include "util/thumbnail_cache.hpp"
 
 namespace waybar::modules::hyprland {
@@ -481,8 +482,8 @@ void FancyWorkspace::updateWindowIcons() {
       icon_names_ordered.push_back(icon_name);
     }
 
-    // Collect window title and address for tooltip and click handler
-    icon_to_titles[icon_name].push_back(window.window_title);
+    // Collect window class, title and address for tooltip and click handler
+    icon_to_titles[icon_name].push_back(window.window_class + " • " + window.window_title);
     icon_to_addresses[icon_name].push_back(window.address);
   }
 
@@ -524,90 +525,51 @@ void FancyWorkspace::updateWindowIcons() {
       }
     }
 
-    // Wrap icon in EventBox to capture clicks
+    // Wrap icon in EventBox to capture clicks and mouse events
     auto* eventBox = new Gtk::EventBox();
     eventBox->add(*img);
+    eventBox->add_events(Gdk::ENTER_NOTIFY_MASK | Gdk::LEAVE_NOTIFY_MASK);
     
-    // Set up custom tooltip with thumbnails - interleave thumbnails and titles
-    // Note: titles and addresses already declared above
-    eventBox->set_has_tooltip(true);
+    // Set up popup on hover with thumbnails
     const auto& addresses = icon_to_addresses[icon_name];
-    eventBox->signal_query_tooltip().connect(
-        [icon_name, addresses, titles](int x, int y, bool keyboard_tooltip, 
-                            const Glib::RefPtr<Gtk::Tooltip>& tooltip_widget) -> bool {
-          // Create tooltip content box
-          auto* vbox = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_VERTICAL, 4));
+    
+    // Mouse enter - show popup
+    eventBox->signal_enter_notify_event().connect(
+        [this, eventBox, icon_name, addresses, titles](GdkEventCrossing* event) -> bool {
+          // Get widget position on screen
+          int x, y;
+          eventBox->get_window()->get_origin(x, y);
+          auto allocation = eventBox->get_allocation();
           
-          if (titles.size() == 1) {
-            // Single window - simple layout
-            waybar::util::ThumbnailCache cache;
-            if (!addresses.empty()) {
-              auto thumbnail_path = cache.getThumbnailPath(addresses[0]);
-              if (thumbnail_path.has_value()) {
-                try {
-                  auto pixbuf = Gdk::Pixbuf::create_from_file(thumbnail_path.value());
-                  int width = pixbuf->get_width();
-                  int height = pixbuf->get_height();
-                  if (width > 256 || height > 256) {
-                    double scale = std::min(256.0 / width, 256.0 / height);
-                    width = static_cast<int>(width * scale);
-                    height = static_cast<int>(height * scale);
-                    pixbuf = pixbuf->scale_simple(width, height, Gdk::INTERP_BILINEAR);
-                  }
-                  auto* thumb_img = Gtk::manage(new Gtk::Image(pixbuf));
-                  vbox->pack_start(*thumb_img, false, false);
-                } catch (const Glib::Error& e) {
-                  spdlog::debug("[WICONS] Failed to load thumbnail for {}: {}", addresses[0], e.what().c_str());
-                }
-              }
-            }
-            // Single title
-            auto* label = Gtk::manage(new Gtk::Label(titles[0]));
-            label->set_xalign(0.0);
-            vbox->pack_start(*label, false, false);
-          } else {
-            // Multiple windows - interleave thumbnails and titles
-            auto* header = Gtk::manage(new Gtk::Label(icon_name + ":"));
-            header->set_xalign(0.0);
-            vbox->pack_start(*header, false, false);
-            
-            waybar::util::ThumbnailCache cache;
-            size_t count = std::min(addresses.size(), titles.size());
-            
-            for (size_t i = 0; i < count; i++) {
-              // Thumbnail
-              auto thumbnail_path = cache.getThumbnailPath(addresses[i]);
-              if (thumbnail_path.has_value()) {
-                try {
-                  auto pixbuf = Gdk::Pixbuf::create_from_file(thumbnail_path.value());
-                  int width = pixbuf->get_width();
-                  int height = pixbuf->get_height();
-                  if (width > 256 || height > 256) {
-                    double scale = std::min(256.0 / width, 256.0 / height);
-                    width = static_cast<int>(width * scale);
-                    height = static_cast<int>(height * scale);
-                    pixbuf = pixbuf->scale_simple(width, height, Gdk::INTERP_BILINEAR);
-                  }
-                  auto* thumb_img = Gtk::manage(new Gtk::Image(pixbuf));
-                  vbox->pack_start(*thumb_img, false, false);
-                } catch (const Glib::Error& e) {
-                  spdlog::debug("[WICONS] Failed to load thumbnail for {}: {}", addresses[i], e.what().c_str());
-                }
-              }
-              
-              // Title
-              std::string titleText = "• " + titles[i];
-              auto* titleLabel = Gtk::manage(new Gtk::Label(titleText));
-              titleLabel->set_xalign(0.0);
-              titleLabel->set_line_wrap(true);
-              titleLabel->set_max_width_chars(50);
-              vbox->pack_start(*titleLabel, false, false);
+          // Calculate popup position (below the icon, centered)
+          int popup_x = x + allocation.get_width() / 2;
+          int popup_y = y + allocation.get_height();
+          
+          // Get monitor name
+          std::string monitor = m_workspaceManager.getBarOutput();
+          
+          // Collect thumbnail paths
+          std::vector<std::string> image_paths;
+          for (const auto& addr : addresses) {
+            auto thumbnail_path = m_workspaceManager.thumbnailCache().getThumbnailPath(addr);
+            if (thumbnail_path.has_value()) {
+              image_paths.push_back(thumbnail_path.value());
+            } else {
+              image_paths.push_back("");  // Empty string for missing thumbnail
             }
           }
           
-          vbox->show_all();
-          tooltip_widget->set_custom(*vbox);
-          return true;
+          // Show popup with thumbnails
+          m_workspaceManager.popupClient().showPopup(popup_x, popup_y, monitor, titles, image_paths);
+          
+          return false;
+        });
+    
+    // Mouse leave - hide popup
+    eventBox->signal_leave_notify_event().connect(
+        [this](GdkEventCrossing* event) -> bool {
+          m_workspaceManager.popupClient().hidePopup();
+          return false;
         });
 
     // Add click handler to focus the first window
@@ -700,6 +662,47 @@ void FancyWorkspace::updateTaskbar(const std::string& workspace_icon) {
     }
     auto event_box = Gtk::manage(new Gtk::EventBox());
     event_box->add(*window_box);
+    event_box->add_events(Gdk::ENTER_NOTIFY_MASK | Gdk::LEAVE_NOTIFY_MASK);
+    
+    // Add popup on hover showing thumbnail and window info
+    event_box->signal_enter_notify_event().connect(
+        [this, event_box, window_repr](GdkEventCrossing* event) -> bool {
+          // Get widget position on screen
+          int x, y;
+          event_box->get_window()->get_origin(x, y);
+          auto allocation = event_box->get_allocation();
+          
+          // Calculate popup position (below the icon, centered)
+          int popup_x = x + allocation.get_width() / 2;
+          int popup_y = y + allocation.get_height();
+          
+          // Get monitor name
+          std::string monitor = m_workspaceManager.getBarOutput();
+          
+          // Get thumbnail path
+          std::vector<std::string> image_paths;
+          auto thumbnail_path = m_workspaceManager.thumbnailCache().getThumbnailPath(window_repr.address);
+          if (thumbnail_path.has_value()) {
+            image_paths.push_back(thumbnail_path.value());
+          } else {
+            image_paths.push_back("");
+          }
+          
+          // Show popup with class name and title
+          std::vector<std::string> titles;
+          titles.push_back(window_repr.window_class + " • " + window_repr.window_title);
+          
+          m_workspaceManager.popupClient().showPopup(popup_x, popup_y, monitor, titles, image_paths);
+          
+          return false;
+        });
+    
+    event_box->signal_leave_notify_event().connect(
+        [this](GdkEventCrossing* event) -> bool {
+          m_workspaceManager.popupClient().hidePopup();
+          return false;
+        });
+    
     if (m_workspaceManager.onClickWindow() != "") {
       event_box->signal_button_press_event().connect(
           sigc::bind(sigc::mem_fun(*this, &FancyWorkspace::handleClick), window_repr.address));
@@ -767,6 +770,11 @@ bool FancyWorkspace::handleClick(const GdkEventButton* event_button,
 }
 
 bool FancyWorkspace::shouldSkipWindow(const FancyWindowRepr& window_repr) const {
+  // Always skip waybar's popup daemon
+  if (window_repr.window_class == "waybar-popup-daemon") {
+    return true;
+  }
+  
   auto ignore_list = m_workspaceManager.getIgnoredWindows();
   auto it = std::ranges::find_if(ignore_list, [&window_repr](const auto& ignoreItem) {
     return std::regex_match(window_repr.window_class, ignoreItem) ||

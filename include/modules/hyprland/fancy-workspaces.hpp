@@ -21,6 +21,7 @@
 #include "modules/hyprland/fancy-workspace.hpp"
 #include "util/enum.hpp"
 #include "util/icon_loader.hpp"
+#include "util/popup_ipc_client.hpp"
 #include "util/regex_collection.hpp"
 #include "util/thumbnail_cache.hpp"
 
@@ -57,6 +58,9 @@ class FancyWorkspaces : public AModule, public EventHandler {
   auto taskbarReverseDirection() const -> bool { return m_taskbarReverseDirection; }
   auto onClickWindow() const -> std::string { return m_onClickWindow; }
   auto getIgnoredWindows() const -> std::vector<std::regex> { return m_ignoreWindows; }
+
+  util::PopupIPCClient& popupClient() { return m_popupClient; }
+  util::ThumbnailCache& thumbnailCache() { return m_thumbnailCache; }
 
   enum class ActiveWindowPosition { NONE, FIRST, LAST };
   auto activeWindowPosition() const -> ActiveWindowPosition { return m_activeWindowPosition; }
@@ -268,6 +272,9 @@ class FancyWorkspaces : public AModule, public EventHandler {
   
   // Track background capture process to kill it if workspace changes
   pid_t m_captureProcessPid = 0;
+  
+  // Popup daemon IPC client for interactive thumbnails
+  util::PopupIPCClient m_popupClient;
 };
 
 }  // namespace waybar::modules::hyprland

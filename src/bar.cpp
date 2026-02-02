@@ -10,6 +10,7 @@
 #include "group.hpp"
 #include "util/enum.hpp"
 #include "util/kill_signal.hpp"
+#include "util/popup_daemon_manager.hpp"
 
 #ifdef HAVE_SWAY
 #include "modules/sway/bar.hpp"
@@ -261,6 +262,16 @@ waybar::Bar::Bar(struct waybar_output* w_output, const Json::Value& w_config)
   }
 
   window.signal_map_event().connect_notify(sigc::mem_fun(*this, &Bar::onMap));
+
+  // Start popup daemon (once per waybar instance, not per bar)
+  static bool daemon_started = false;
+  if (!daemon_started) {
+    daemon_started = true;
+    auto& daemon_manager = waybar::util::PopupDaemonManager::getInstance();
+    if (!daemon_manager.ensureDaemonRunning()) {
+      spdlog::warn("Failed to start popup daemon, thumbnail popups will not work");
+    }
+  }
 
 #if HAVE_SWAY
   if (auto ipc = config["ipc"]; ipc.isBool() && ipc.asBool()) {

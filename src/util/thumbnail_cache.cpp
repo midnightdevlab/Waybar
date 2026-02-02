@@ -86,6 +86,7 @@ void ThumbnailCache::captureWindow(const std::string& windowAddress, int x, int 
   spdlog::debug("[THUMBNAIL] Capturing window {}: {}x{} at {},{}", windowAddress, width, height, x, y);
   
   std::string full_path = m_cacheDir + "/full_" + windowAddress + ".png";
+  std::string temp_thumb = m_cacheDir + "/temp_" + windowAddress + "_" + std::to_string(getpid()) + ".png";
   std::string thumb_path = getThumbnailFilePath(windowAddress);
   std::string meta_path = getMetadataFilePath(windowAddress);
   
@@ -106,34 +107,63 @@ void ThumbnailCache::captureWindow(const std::string& windowAddress, int x, int 
       _exit(1);
     }
     
-    // Resize to thumbnail
+    // Resize to thumbnail (using temp file)
     std::string resize_cmd_name = getResizeCommand();
     std::ostringstream resize_cmd;
-    resize_cmd << resize_cmd_name << " " << full_path << " -resize 256x256 " << thumb_path
+    resize_cmd << resize_cmd_name << " " << full_path << " -resize 256x256 " << temp_thumb
                << " 2>/dev/null";
     result = system(resize_cmd.str().c_str());
     if (result != 0) {
       spdlog::debug("[THUMBNAIL] Resize failed for window {}", windowAddress);
+      unlink(full_path.c_str());
       _exit(1);
     }
     
     // Clean up full size image
     unlink(full_path.c_str());
     
-    // Write metadata
-    std::ofstream meta_file(meta_path);
-    if (meta_file.is_open()) {
-      auto now = std::chrono::system_clock::now();
-      auto timestamp = std::chrono::system_clock::to_time_t(now);
+    // Verify workspace is still the same before committing
+    // Query current workspace of the window
+    std::string cmd = "hyprctl clients -j | jq -r '.[] | select(.address==\"0x" + windowAddress + "\") | .workspace.name'";
+    FILE* pipe = popen(cmd.c_str(), "r");
+    std::string current_workspace;
+    if (pipe) {
+      char buffer[256];
+      if (fgets(buffer, sizeof(buffer), pipe)) {
+        current_workspace = buffer;
+        // Remove trailing newline
+        if (!current_workspace.empty() && current_workspace.back() == '\n') {
+          current_workspace.pop_back();
+        }
+      }
+      pclose(pipe);
+    }
+    
+    // Only commit if workspace hasn't changed
+    if (current_workspace == workspaceName) {
+      spdlog::debug("[THUMBNAIL] Workspace still {}, committing thumbnail", workspaceName);
+      // Atomic move from temp to final location
+      rename(temp_thumb.c_str(), thumb_path.c_str());
       
-      meta_file << "address=" << windowAddress << "\n";
-      meta_file << "class=" << windowClass << "\n";
-      meta_file << "title=" << windowTitle << "\n";
-      meta_file << "workspace=" << workspaceName << "\n";
-      meta_file << "timestamp=" << timestamp << "\n";
-      meta_file << "width=" << width << "\n";
-      meta_file << "height=" << height << "\n";
-      meta_file.close();
+      // Write metadata
+      std::ofstream meta_file(meta_path);
+      if (meta_file.is_open()) {
+        auto now = std::chrono::system_clock::now();
+        auto timestamp = std::chrono::system_clock::to_time_t(now);
+        
+        meta_file << "address=" << windowAddress << "\n";
+        meta_file << "class=" << windowClass << "\n";
+        meta_file << "title=" << windowTitle << "\n";
+        meta_file << "workspace=" << workspaceName << "\n";
+        meta_file << "timestamp=" << timestamp << "\n";
+        meta_file << "width=" << width << "\n";
+        meta_file << "height=" << height << "\n";
+        meta_file.close();
+      }
+    } else {
+      spdlog::debug("[THUMBNAIL] Workspace changed from {} to {}, discarding thumbnail", 
+                    workspaceName, current_workspace);
+      unlink(temp_thumb.c_str());
     }
     
     _exit(0);
