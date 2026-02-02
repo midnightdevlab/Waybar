@@ -144,9 +144,12 @@ public:
         }
       }
       
-      // Add title label below image
+      // Add title label below image with word wrapping
       auto* label = Gtk::manage(new Gtk::Label("• " + titles[i]));
       label->set_xalign(0.0);
+      label->set_line_wrap(true);
+      label->set_line_wrap_mode(Pango::WRAP_WORD_CHAR);
+      label->set_max_width_chars(30);
       vbox->pack_start(*label, false, false);
       
       m_box.pack_start(*vbox, false, false);
