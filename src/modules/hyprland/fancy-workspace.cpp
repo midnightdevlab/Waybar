@@ -211,25 +211,22 @@ bool FancyWorkspace::handleClicked(GdkEventButton* bt) const {
         } else {
           spdlog::warn("Workspace creation script failed: {}", result.out);
         }
-        // Always return true to prevent dispatching workspace switch on already-active workspace
-        // This prevents Hyprland crash when clicking on empty active workspaces
+        // Always return true to avoid dispatching workspace switch to already-active workspace
         return true;
       }
 
       // Normal workspace switching behavior (left-click on inactive workspace)
       if (bt->button == 1) {
-        spdlog::info("#DEBUG Click handler: workspace='{}' id={} isActive={} isSpecial={} isPersistent={} isEmpty={}", 
-                     name(), id(), isActive(), isSpecial(), isPersistent(), isEmpty());
-        
-        // Safety check: Never dispatch workspaces with ID=0 (invalid state)
+        // Safety check: Never dispatch workspaces with ID=0 (invalid/non-existent state)
+        // Named workspaces that haven't been created in Hyprland yet may have ID=0
+        // Dispatching to them causes Hyprland to crash with division by zero error
         if (id() == 0) {
-          spdlog::error("#DEBUG Refusing to dispatch workspace with ID=0: name='{}' isPersistent={}", 
-                        name(), isPersistent());
-          return true;  // Consume the click to prevent issues
+          spdlog::warn("Refusing to dispatch workspace with ID=0: name='{}' isPersistent={}", 
+                       name(), isPersistent());
+          return true;  // Consume the click to prevent crash
         }
         
         if (id() > 0) {  // normal
-          spdlog::info("#DEBUG Dispatching to numbered workspace id={}", id());
           if (m_workspaceManager.moveToMonitor()) {
             m_ipc.getSocket1Reply("dispatch focusworkspaceoncurrentmonitor " +
                                   std::to_string(id()));
@@ -237,17 +234,14 @@ bool FancyWorkspace::handleClicked(GdkEventButton* bt) const {
             m_ipc.getSocket1Reply("dispatch workspace " + std::to_string(id()));
           }
         } else if (!isSpecial()) {  // named (this includes persistent)
-          spdlog::info("#DEBUG Dispatching to named workspace name='{}' id={}", name(), id());
           if (m_workspaceManager.moveToMonitor()) {
             m_ipc.getSocket1Reply("dispatch focusworkspaceoncurrentmonitor name:" + name());
           } else {
             m_ipc.getSocket1Reply("dispatch workspace name:" + name());
           }
         } else if (id() != -99) {  // named special
-          spdlog::info("#DEBUG Dispatching to named special workspace name='{}' id={}", name(), id());
           m_ipc.getSocket1Reply("dispatch togglespecialworkspace " + name());
         } else {  // special
-          spdlog::info("#DEBUG Dispatching to special workspace");
           m_ipc.getSocket1Reply("dispatch togglespecialworkspace");
         }
         return true;

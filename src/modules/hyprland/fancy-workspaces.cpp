@@ -61,9 +61,6 @@ Json::Value FancyWorkspaces::createMonitorWorkspaceData(std::string const& name,
   auto workspaceId = parseWorkspaceId(name);
   if (!workspaceId.has_value()) {
     workspaceId = 0;
-    spdlog::info("#DEBUG createMonitorWorkspaceData: workspace name='{}' could not be parsed, setting id=0", name);
-  } else {
-    spdlog::info("#DEBUG createMonitorWorkspaceData: workspace name='{}' parsed to id={}", name, *workspaceId);
   }
   workspaceData["id"] = *workspaceId;
   workspaceData["name"] = name;
@@ -77,14 +74,9 @@ void FancyWorkspaces::createWorkspace(Json::Value const& workspace_data,
   auto workspaceName = workspace_data["name"].asString();
   auto workspaceId = workspace_data["id"].asInt();
 
-  spdlog::info("#DEBUG createWorkspace: name='{}' id={} persistent-rule={} persistent-config={}", 
-               workspaceName, workspaceId,
-               workspace_data.get("persistent-rule", Json::Value(false)).asBool(),
-               workspace_data.get("persistent-config", Json::Value(false)).asBool());
-
   // Skip workspaces with ID 0 (these are workspace rules like "n[s:.]", not real workspaces)
   if (workspaceId == 0) {
-    spdlog::info("#DEBUG Workspace '{}' skipped: invalid id {}", workspaceName, workspaceId);
+    spdlog::debug("Workspace '{}' skipped: invalid id {}", workspaceName, workspaceId);
     return;
   }
 
@@ -148,14 +140,6 @@ void FancyWorkspaces::createWorkspacesToCreate() {
  */
 void FancyWorkspaces::doUpdate() {
   std::unique_lock lock(m_mutex);
-
-  // #DEBUG: Check for any workspaces with invalid ID=0
-  for (const auto& ws : m_workspaces) {
-    if (ws->id() == 0) {
-      spdlog::warn("#DEBUG Found workspace with ID=0: name='{}' isActive={} isPersistent={} isSpecial={}", 
-                   ws->name(), ws->isActive(), ws->isPersistent(), ws->isSpecial());
-    }
-  }
 
   removeWorkspacesToRemove();
   createWorkspacesToCreate();
