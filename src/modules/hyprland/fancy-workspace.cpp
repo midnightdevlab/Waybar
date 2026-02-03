@@ -210,15 +210,24 @@ bool FancyWorkspace::handleClicked(GdkEventButton* bt) const {
             util::command::exec("waybar-workspace-create-current.sh", "workspace-create");
         if (result.exit_code == 0) {
           spdlog::info("Created new workspace via script");
-          return true;
         } else {
           spdlog::warn("Workspace creation script failed: {}", result.out);
-          // Fall through to normal behavior
         }
+        // Always return true to avoid dispatching workspace switch to already-active workspace
+        return true;
       }
 
       // Normal workspace switching behavior (left-click on inactive workspace)
       if (bt->button == 1) {
+        // Safety check: Never dispatch workspaces with ID=0 (invalid/non-existent state)
+        // Named workspaces that haven't been created in Hyprland yet may have ID=0
+        // Dispatching to them causes Hyprland to crash with division by zero error
+        if (id() == 0) {
+          spdlog::warn("Refusing to dispatch workspace with ID=0: name='{}' isPersistent={}", 
+                       name(), isPersistent());
+          return true;  // Consume the click to prevent crash
+        }
+        
         if (id() > 0) {  // normal
           if (m_workspaceManager.moveToMonitor()) {
             m_ipc.getSocket1Reply("dispatch focusworkspaceoncurrentmonitor " +
