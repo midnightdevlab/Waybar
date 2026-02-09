@@ -1,5 +1,5 @@
 #!/bin/bash
-# Workspace navigation script - sorts by NAME (alphabetical)
+# Workspace navigation script - sorts by NAME (natural sort with numeric awareness)
 # Usage: waybar-workspace-nav.sh next|prev [nonempty] [move]
 
 DIRECTION="$1"
@@ -29,8 +29,8 @@ if [ -z "$WORKSPACES" ]; then
     exit 1
 fi
 
-# Sort alphabetically by name
-SORTED=$(echo "$WORKSPACES" | sort)
+# Sort naturally by name (handles numbers correctly: 1, 2, 10 instead of 1, 10, 2)
+SORTED=$(echo "$WORKSPACES" | sort -V)
 
 # Convert to array
 mapfile -t WS_ARRAY <<< "$SORTED"
