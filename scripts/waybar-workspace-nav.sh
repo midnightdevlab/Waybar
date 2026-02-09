@@ -1,9 +1,10 @@
 #!/bin/bash
 # Workspace navigation script - sorts by NAME (alphabetical)
-# Usage: waybar-workspace-nav.sh next|prev [nonempty]
+# Usage: waybar-workspace-nav.sh next|prev [nonempty] [move]
 
 DIRECTION="$1"
 FILTER="${2:-all}"  # "nonempty" or "all" (default)
+ACTION="${3:-navigate}"  # "move" or "navigate" (default)
 
 # Get current active workspace
 ACTIVE_WS=$(hyprctl activeworkspace -j | jq -r '.name')
@@ -70,5 +71,9 @@ fi
 
 TARGET_WS="${WS_ARRAY[$NEW_INDEX]}"
 
-# Switch to workspace
-hyprctl dispatch workspace "name:$TARGET_WS"
+# Switch to workspace or move window
+if [ "$ACTION" = "move" ]; then
+    hyprctl dispatch movetoworkspace "name:$TARGET_WS"
+else
+    hyprctl dispatch workspace "name:$TARGET_WS"
+fi
