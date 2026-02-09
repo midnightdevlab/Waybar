@@ -50,13 +50,16 @@ inline int close(FILE* fp, pid_t pid) {
     ret = waitpid(pid, &stat, WCONTINUED | WUNTRACED);
 
     if (WIFEXITED(stat)) {
-      spdlog::debug("Cmd exited with code {}", WEXITSTATUS(stat));
+      int exit_code = WEXITSTATUS(stat);
+      if (exit_code != 0) {
+        spdlog::debug("Cmd (pid {}) exited with code {}", pid, exit_code);
+      }
     } else if (WIFSIGNALED(stat)) {
-      spdlog::debug("Cmd killed by {}", WTERMSIG(stat));
+      spdlog::debug("Cmd (pid {}) killed by signal {}", pid, WTERMSIG(stat));
     } else if (WIFSTOPPED(stat)) {
-      spdlog::debug("Cmd stopped by {}", WSTOPSIG(stat));
+      spdlog::debug("Cmd (pid {}) stopped by signal {}", pid, WSTOPSIG(stat));
     } else if (WIFCONTINUED(stat)) {
-      spdlog::debug("Cmd continued");
+      spdlog::debug("Cmd (pid {}) continued", pid);
     } else if (ret == -1) {
       spdlog::debug("waitpid failed: {}", strerror(errno));
     } else {

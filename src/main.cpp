@@ -136,7 +136,6 @@ static void handleSignalMainThread(int signum, bool& reload) {
       waybar::Client::inst()->reset();
       break;
     case SIGCHLD:
-      spdlog::debug("Received SIGCHLD in signalThread");
       if (!reap.empty()) {
         reap_mtx.lock();
         for (auto it = reap.begin(); it != reap.end(); ++it) {
