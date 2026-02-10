@@ -250,6 +250,9 @@ class FancyWorkspaces : public AModule, public EventHandler {
   // Track urgent window addresses for precise urgent styling
   std::set<std::string> m_urgentWindows;
   
+  // Track icon buttons with their associated window addresses for urgent clearing
+  std::map<Gtk::Button*, std::vector<std::string>> m_iconButtonAddresses;
+  
   // Helper method for smart window selection in collapsed icons
   std::string selectBestWindowForIcon(
     const std::vector<std::string>& addresses,

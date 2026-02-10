@@ -1249,6 +1249,23 @@ void FancyWorkspaces::updateWorkspaceStates() {
         spdlog::debug("Erased {} (was {}present)", addr, erased ? "" : "NOT ");
       }
       spdlog::debug("Urgent windows remaining: {}", m_urgentWindows.size());
+      
+      // Clear urgent class from collapsed group icon buttons
+      for (auto& [iconBtn, addresses] : m_iconButtonAddresses) {
+        // Check if this icon has the urgent class
+        auto styleContext = iconBtn->get_style_context();
+        if (styleContext->has_class("urgent")) {
+          // Check if any of this icon's windows are still urgent
+          bool stillHasUrgent = std::ranges::any_of(addresses, [this](const std::string& addr) {
+            return m_urgentWindows.contains("0x" + addr);
+          });
+          
+          if (!stillHasUrgent) {
+            spdlog::debug("[ICON_URGENT] Clearing urgent from icon with addresses count: {}", addresses.size());
+            styleContext->remove_class("urgent");
+          }
+        }
+      }
     }
     workspace->setVisible(std::ranges::find(visibleWorkspaces, workspace->id()) !=
                           visibleWorkspaces.end());
@@ -1602,6 +1619,9 @@ void FancyWorkspaces::applyProjectCollapsing() {
     m_box.remove(*btn);
   }
   m_labelButtons.clear();
+  
+  // Clear old icon button tracking
+  m_iconButtonAddresses.clear();
 
   // Apply collapsing/transform logic
   // Track position offset as groups add elements
@@ -1839,6 +1859,9 @@ void FancyWorkspaces::applyProjectCollapsing() {
             spdlog::debug("[ICON_URGENT] Icon '{}' has urgent window, applying class", iconName);
             iconBtn->get_style_context()->add_class("urgent");
           }
+          
+          // Track icon button with its window addresses for urgent clearing
+          m_iconButtonAddresses[iconBtn] = iconAddresses;
 
           // Add click handler for icon - smart window focus
           std::vector<std::string> allAddresses = iconToAddresses[iconName];
