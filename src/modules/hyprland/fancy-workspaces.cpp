@@ -1216,6 +1216,22 @@ bool FancyWorkspaces::updateWindowsToCreate() {
 void FancyWorkspaces::updateWorkspaceStates() {
   const std::vector<int> visibleWorkspaces = getVisibleWorkspaces();
   auto updatedWorkspaces = m_ipc.getSocket1JsonReply("workspaces");
+  
+  // Clean up stale urgent windows (that no longer exist)
+  const Json::Value clientsJson = m_ipc.getSocket1JsonReply("clients");
+  std::set<std::string> existingAddresses;
+  for (const auto& client : clientsJson) {
+    existingAddresses.insert(client["address"].asString());
+  }
+  
+  // Remove urgent markers for windows that no longer exist
+  std::erase_if(m_urgentWindows, [&existingAddresses](const std::string& addr) {
+    bool exists = existingAddresses.contains(addr);
+    if (!exists) {
+      spdlog::debug("[ICON_URGENT] Removing stale urgent window: {}", addr);
+    }
+    return !exists;
+  });
 
   auto currentWorkspace = m_ipc.getSocket1JsonReply("activeworkspace");
   std::string currentWorkspaceName =
