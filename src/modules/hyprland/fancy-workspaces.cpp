@@ -1802,31 +1802,33 @@ void FancyWorkspaces::applyProjectCollapsing() {
           // Build tooltip data - keep structured for interleaving
           const auto& workspaceAndTitles = iconToWorkspaceAndTitles[iconName];
           
-          // Set up custom tooltip with thumbnails
+          // Set up tooltip
           const auto& iconAddresses = iconToAddresses[iconName];
-          iconBtn->set_has_tooltip(true);
           bool showThumbnails = m_showThumbnails;
-          iconBtn->signal_query_tooltip().connect(
-              [iconName, workspaceAndTitles, iconAddresses, showThumbnails](int x, int y, bool keyboard_tooltip,
-                                       const Glib::RefPtr<Gtk::Tooltip>& tooltip_widget) -> bool {
-                // Create tooltip content box
-                auto* vbox = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_VERTICAL, 4));
-                
-                // Add header
-                auto* header = Gtk::manage(new Gtk::Label(iconName + ":"));
-                header->set_xalign(0.0);
-                vbox->pack_start(*header, false, false);
-                
-                // Interleave thumbnails and titles
-                waybar::util::ThumbnailCache cache;
-                size_t count = std::min(iconAddresses.size(), workspaceAndTitles.size());
-                
-                for (size_t i = 0; i < count; i++) {
-                  const auto& addr = iconAddresses[i];
-                  const auto& [wsName, title] = workspaceAndTitles[i];
+          
+          if (showThumbnails) {
+            // Custom tooltip with thumbnails
+            iconBtn->set_has_tooltip(true);
+            iconBtn->signal_query_tooltip().connect(
+                [iconName, workspaceAndTitles, iconAddresses, showThumbnails](int x, int y, bool keyboard_tooltip,
+                                         const Glib::RefPtr<Gtk::Tooltip>& tooltip_widget) -> bool {
+                  // Create tooltip content box
+                  auto* vbox = Gtk::manage(new Gtk::Box(Gtk::ORIENTATION_VERTICAL, 4));
                   
-                  // Try to load thumbnail only if enabled
-                  if (showThumbnails) {
+                  // Add header
+                  auto* header = Gtk::manage(new Gtk::Label(iconName + ":"));
+                  header->set_xalign(0.0);
+                  vbox->pack_start(*header, false, false);
+                  
+                  // Interleave thumbnails and titles
+                  waybar::util::ThumbnailCache cache;
+                  size_t count = std::min(iconAddresses.size(), workspaceAndTitles.size());
+                  
+                  for (size_t i = 0; i < count; i++) {
+                    const auto& addr = iconAddresses[i];
+                    const auto& [wsName, title] = workspaceAndTitles[i];
+                    
+                    // Try to load thumbnail
                     auto thumbnail_path = cache.getThumbnailPath(addr);
                     if (thumbnail_path.has_value()) {
                       try {
@@ -1848,21 +1850,28 @@ void FancyWorkspaces::applyProjectCollapsing() {
                                       e.what().c_str());
                       }
                     }
+                    
+                    // Add title with workspace
+                    std::string titleText = "  " + wsName + ": " + title;
+                    auto* titleLabel = Gtk::manage(new Gtk::Label(titleText));
+                    titleLabel->set_xalign(0.0);
+                    titleLabel->set_line_wrap(true);
+                    titleLabel->set_max_width_chars(50);
+                    vbox->pack_start(*titleLabel, false, false);
                   }
                   
-                  // Add title with workspace
-                  std::string titleText = "  " + wsName + ": " + title;
-                  auto* titleLabel = Gtk::manage(new Gtk::Label(titleText));
-                  titleLabel->set_xalign(0.0);
-                  titleLabel->set_line_wrap(true);
-                  titleLabel->set_max_width_chars(50);
-                  vbox->pack_start(*titleLabel, false, false);
-                }
-                
-                vbox->show_all();
-                tooltip_widget->set_custom(*vbox);
-                return true;
-              });
+                  vbox->show_all();
+                  tooltip_widget->set_custom(*vbox);
+                  return true;
+                });
+          } else {
+            // Simple text tooltip
+            std::string tooltipText = iconName + ":\n";
+            for (const auto& [wsName, title] : workspaceAndTitles) {
+              tooltipText += "  " + wsName + ": " + title + "\n";
+            }
+            iconBtn->set_tooltip_text(tooltipText);
+          }
 
           // Check if any of this icon's windows are urgent (by address)
           // (iconAddresses already captured in lambda above)
