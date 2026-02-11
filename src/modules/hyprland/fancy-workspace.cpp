@@ -528,49 +528,56 @@ void FancyWorkspace::updateWindowIcons() {
     // Wrap icon in EventBox to capture clicks and mouse events
     auto* eventBox = new Gtk::EventBox();
     eventBox->add(*img);
-    eventBox->add_events(Gdk::ENTER_NOTIFY_MASK | Gdk::LEAVE_NOTIFY_MASK);
     
-    // Set up popup on hover with thumbnails
-    const auto& addresses = icon_to_addresses[icon_name];
+    bool showThumbnails = m_workspaceManager.showThumbnails();
     
-    // Mouse enter - show popup
-    eventBox->signal_enter_notify_event().connect(
-        [this, eventBox, icon_name, addresses, titles](GdkEventCrossing* event) -> bool {
-          // Get widget position on screen
-          int x, y;
-          eventBox->get_window()->get_origin(x, y);
-          auto allocation = eventBox->get_allocation();
-          
-          // Calculate popup position (below the icon, centered)
-          int popup_x = x + allocation.get_width() / 2;
-          int popup_y = y + allocation.get_height();
-          
-          // Get monitor name
-          std::string monitor = m_workspaceManager.getBarOutput();
-          
-          // Collect thumbnail paths
-          std::vector<std::string> image_paths;
-          for (const auto& addr : addresses) {
-            auto thumbnail_path = m_workspaceManager.thumbnailCache().getThumbnailPath(addr);
-            if (thumbnail_path.has_value()) {
-              image_paths.push_back(thumbnail_path.value());
-            } else {
-              image_paths.push_back("");  // Empty string for missing thumbnail
+    if (showThumbnails) {
+      // Set up popup on hover with thumbnails
+      eventBox->add_events(Gdk::ENTER_NOTIFY_MASK | Gdk::LEAVE_NOTIFY_MASK);
+      const auto& addresses = icon_to_addresses[icon_name];
+      
+      // Mouse enter - show popup
+      eventBox->signal_enter_notify_event().connect(
+          [this, eventBox, icon_name, addresses, titles](GdkEventCrossing* event) -> bool {
+            // Get widget position on screen
+            int x, y;
+            eventBox->get_window()->get_origin(x, y);
+            auto allocation = eventBox->get_allocation();
+            
+            // Calculate popup position (below the icon, centered)
+            int popup_x = x + allocation.get_width() / 2;
+            int popup_y = y + allocation.get_height();
+            
+            // Get monitor name
+            std::string monitor = m_workspaceManager.getBarOutput();
+            
+            // Collect thumbnail paths
+            std::vector<std::string> image_paths;
+            for (const auto& addr : addresses) {
+              auto thumbnail_path = m_workspaceManager.thumbnailCache().getThumbnailPath(addr);
+              if (thumbnail_path.has_value()) {
+                image_paths.push_back(thumbnail_path.value());
+              } else {
+                image_paths.push_back("");  // Empty string for missing thumbnail
+              }
             }
-          }
-          
-          // Show popup with thumbnails
-          m_workspaceManager.popupClient().showPopup(popup_x, popup_y, monitor, titles, image_paths);
-          
-          return false;
-        });
-    
-    // Mouse leave - hide popup
-    eventBox->signal_leave_notify_event().connect(
-        [this](GdkEventCrossing* event) -> bool {
-          m_workspaceManager.popupClient().hidePopup();
-          return false;
-        });
+            
+            // Show popup with thumbnails
+            m_workspaceManager.popupClient().showPopup(popup_x, popup_y, monitor, titles, image_paths);
+            
+            return false;
+          });
+      
+      // Mouse leave - hide popup
+      eventBox->signal_leave_notify_event().connect(
+          [this](GdkEventCrossing* event) -> bool {
+            m_workspaceManager.popupClient().hidePopup();
+            return false;
+          });
+    } else {
+      // Simple tooltip when thumbnails disabled
+      eventBox->set_tooltip_text(tooltip);
+    }
 
     // Add click handler to focus the first window
     if (!addresses.empty()) {

@@ -47,6 +47,7 @@ class FancyWorkspaces : public AModule, public EventHandler {
   auto moveToMonitor() const -> bool { return m_moveToMonitor; }
   auto enableTaskbar() const -> bool { return m_enableTaskbar; }
   auto taskbarWithIcon() const -> bool { return m_taskbarWithIcon; }
+  auto showThumbnails() const -> bool { return m_showThumbnails; }
 
   auto getBarOutput() const -> std::string { return m_bar.output->name; }
   auto formatBefore() const -> std::string { return m_formatBefore; }
