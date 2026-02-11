@@ -263,13 +263,39 @@ waybar::Bar::Bar(struct waybar_output* w_output, const Json::Value& w_config)
 
   window.signal_map_event().connect_notify(sigc::mem_fun(*this, &Bar::onMap));
 
-  // Start popup daemon (once per waybar instance, not per bar)
+  // Start popup daemon only if thumbnails are enabled in any fancy-workspaces module
   static bool daemon_started = false;
   if (!daemon_started) {
     daemon_started = true;
-    auto& daemon_manager = waybar::util::PopupDaemonManager::getInstance();
-    if (!daemon_manager.ensureDaemonRunning()) {
-      spdlog::warn("Failed to start popup daemon, thumbnail popups will not work");
+    bool thumbnails_enabled = false;
+    
+    // Check all module positions for fancy-workspaces with show-thumbnails
+    for (const auto& pos : {"modules-left", "modules-center", "modules-right"}) {
+      if (config[pos].isArray()) {
+        for (const auto& module : config[pos]) {
+          if (module.isString() && module.asString().find("hyprland/fancy-workspaces") != std::string::npos) {
+            // Extract module name (e.g., "hyprland/fancy-workspaces#bar1" -> "hyprland/fancy-workspaces#bar1")
+            std::string module_name = module.asString();
+            
+            // Check if this module has show-thumbnails enabled
+            if (config[module_name].isMember("show-thumbnails") && 
+                config[module_name]["show-thumbnails"].asBool()) {
+              thumbnails_enabled = true;
+              break;
+            }
+          }
+        }
+        if (thumbnails_enabled) break;
+      }
+    }
+    
+    if (thumbnails_enabled) {
+      auto& daemon_manager = waybar::util::PopupDaemonManager::getInstance();
+      if (!daemon_manager.ensureDaemonRunning()) {
+        spdlog::warn("Failed to start popup daemon, thumbnail popups will not work");
+      }
+    } else {
+      spdlog::debug("Thumbnail daemon not started (show-thumbnails disabled in all modules)");
     }
   }
 
