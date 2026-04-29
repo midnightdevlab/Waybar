@@ -1,6 +1,6 @@
 project(
     'waybar', 'cpp', 'c',
-    version: '0.14.0',
+    version: '0.15.0',
     license: 'MIT',
     meson_version: '>= 0.59.0',
     default_options : [
@@ -189,6 +189,7 @@ src_files = files(
     'src/util/thumbnail_cache.cpp',
     'src/util/popup_daemon_manager.cpp',
     'src/util/popup_ipc_client.cpp'
+    'src/util/transform_8bit_to_rgba.cpp'
 )
 
 man_files = files(

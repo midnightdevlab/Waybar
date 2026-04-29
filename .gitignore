@@ -54,3 +54,4 @@ result-*
 TODO.md
 *.html
 _codeql_detected_source_root
+heaptrack*
