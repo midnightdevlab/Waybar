@@ -9,62 +9,45 @@ This is Roby's customized Waybar fork with enhanced Hyprland workspace features:
 
 ## Installation on Arch Linux
 
-### Initial Installation
+Installs as a proper Arch package (`waybar-custom`) via `makepkg` + `pacman`,
+replacing the official `extra/waybar` cleanly. Pacman tracks every installed
+file, so uninstall and roundtrip back to upstream are one-liners.
 
-1. **Remove official Waybar package**
-   ```bash
-   sudo pacman -R waybar
-   ```
-   This prevents conflicts and ensures no scripts hardcode the path.
-
-2. **Build the custom version**
-   ```bash
-   cd /home/roby/Developer/opensource/Waybar
-   meson setup build  # Only needed once
-   ninja -C build
-   ```
-
-3. **Install to system**
-   ```bash
-   sudo ninja -C build install
-   ```
-   This installs to `/usr/local/bin/waybar` which takes precedence in PATH.
-
-4. **Verify installation**
-   ```bash
-   which waybar         # Should show: /usr/local/bin/waybar
-   waybar --version     # Should show: 0.14.0 (or current version)
-   ```
-
-5. **Restart Waybar**
-   ```bash
-   killall waybar
-   waybar &
-   # Or if using systemd:
-   systemctl --user restart waybar
-   ```
-
-### Update Workflow
-
-When you make changes to the code:
+### Initial installation / update
 
 ```bash
 cd /home/roby/Developer/opensource/Waybar
-git pull  # If pulling from remote
-ninja -C build
-sudo ninja -C build install
+./scripts/install.sh
+```
+
+The script will:
+1. Offer to clean up any stale files left by the old `local-install.sh` under `/usr/local`.
+2. Fix root-owned files in `build/` from prior `sudo` builds (if any).
+3. Run `makepkg -fsi` from `roby-arch-package/` — installs missing build deps,
+   builds the package from the current working tree (committed + uncommitted
+   changes), and installs via `pacman -U`. pacman automatically removes the
+   official `waybar` package via the PKGBUILD's `conflicts`/`replaces`.
+
+After install:
+- Binary at `/usr/bin/waybar` (canonical Arch path — NOT `/usr/local/bin`)
+- Config at `/etc/xdg/waybar/`
+- systemd user unit at `/usr/lib/systemd/user/waybar.service`
+- Man pages at `/usr/share/man/man5/`
+
+### Restart Waybar
+
+```bash
 killall waybar
 waybar &
+# or
+systemctl --user restart waybar
 ```
 
 ### Uninstallation
 
-To remove custom build and revert to official:
-
 ```bash
-cd /home/roby/Developer/opensource/Waybar
-sudo ninja -C build uninstall
-sudo pacman -S waybar
+sudo pacman -R waybar-custom    # remove the custom build
+sudo pacman -S waybar           # restore the official upstream package
 ```
 
 ## Configuration
@@ -204,9 +187,12 @@ Examples:
 ### Waybar not found
 ```bash
 which waybar
-# Should show: /usr/local/bin/waybar
-# If not, check PATH includes /usr/local/bin before /usr/sbin
+# Should show: /usr/bin/waybar
+pacman -Qi waybar-custom    # confirm the custom build is the installed package
 ```
+If `which waybar` still shows `/usr/local/bin/waybar`, you have leftover debris
+from the old `local-install.sh`. Re-run `./scripts/install.sh` and accept the
+cleanup prompt.
 
 ### Features not working
 ```bash
@@ -249,7 +235,7 @@ Fork location: https://github.com/yourusername/Waybar
 
 ## Notes
 
-- Build directory must be kept for reinstalls: `/home/roby/Developer/opensource/Waybar/build/`
-- Config changes don't require rebuild, just restart waybar
-- Code changes require: rebuild → reinstall → restart
-- Man pages are also installed to `/usr/local/share/man/man5/`
+- The repo-root `build/` directory is for dev iteration (`meson compile -C build && ./build/waybar`); `makepkg` builds in its own scratch dir under `roby-arch-package/src/` and does not touch `build/`.
+- Config changes don't require rebuild, just restart waybar.
+- Code changes require: `./scripts/install.sh` → restart waybar.
+- Man pages installed at `/usr/share/man/man5/` (canonical Arch path).

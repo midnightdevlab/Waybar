@@ -1,0 +1,52 @@
+# Maintainer: Roberto Previdi <hariseldon78@gmail.com>
+# Builds Waybar from the local working tree (committed + uncommitted changes).
+# Installs into the canonical Arch paths and replaces extra/waybar via pacman.
+
+pkgname=waybar-custom
+pkgver=0.15.0.r4617.ceeed011
+pkgrel=1
+pkgdesc="Waybar — roby's fork with named-persistent workspace groups (Hyprland)"
+arch=('x86_64')
+url="https://github.com/Alexays/Waybar"
+license=('MIT')
+conflicts=('waybar')
+provides=("waybar=${pkgver}")
+replaces=('waybar')
+depends=(
+  atkmm cairomm fmt glib2 glibc glibmm gpsd gtk-layer-shell gtk3 gtkmm3
+  jack jsoncpp libdbusmenu-gtk3 libevdev libgcc libinput libmpdclient libnl
+  libpipewire libpulse libsigc++ libstdc++ libwireplumber libxkbcommon
+  playerctl sndio spdlog systemd-libs upower wayland
+)
+makedepends=(meson ninja cmake scdoc wayland-protocols git)
+optdepends=('otf-font-awesome: Icons in the default configuration')
+source=()
+sha256sums=()
+
+_srcroot() {
+  printf '%s\n' "${startdir}/.."
+}
+
+pkgver() {
+  cd "$(_srcroot)"
+  printf '0.15.0.r%s.%s' \
+    "$(git rev-list --count HEAD)" \
+    "$(git rev-parse --short HEAD)"
+}
+
+build() {
+  # cava: disabled because subprojects/libcava.wrap has a stale source_hash
+  #       (upstream repo issue, fix tracked separately). The fork does not use cava.
+  # tests: disabled because the bundled Catch2 wrap (3.7.0) ABI-mismatches
+  #        the system Catch2 (3.15.0); tests aren't shipped in the package.
+  arch-meson "$(_srcroot)" build \
+    -D cava=disabled \
+    -D tests=disabled
+  meson compile -C build
+}
+
+package() {
+  meson install -C build --destdir "${pkgdir}"
+  install -Dm644 "$(_srcroot)/LICENSE" \
+    "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}
