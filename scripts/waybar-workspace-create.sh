@@ -41,7 +41,7 @@ if [ -z "$PROJECT_WORKSPACES" ]; then
 else
     # Extract all numbers and sort them
     NUMBERS=$(echo "$PROJECT_WORKSPACES" | grep -oP "(?<=^\.${SELECTED_PROJECT})[0-9]+" | sort -n)
-    
+
     # Find the lowest unused number (check for holes or use max+1)
     NEW_NUMBER=0
     while IFS= read -r num; do
@@ -60,7 +60,7 @@ NEW_WORKSPACE=".${SELECTED_PROJECT}${NEW_NUMBER}"
 echo "Creating workspace: $NEW_WORKSPACE on monitor $CURRENT_MONITOR"
 
 # Create and switch to the new workspace
-hyprctl dispatch workspace "name:$NEW_WORKSPACE"
+hyprctl dispatch "hl.dsp.focus({workspace='name:$NEW_WORKSPACE'})"
 
 # Track workspace in persistent list
 WORKSPACE_LIST="$HOME/.config/hypr/workspaces-list"

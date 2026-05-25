@@ -173,8 +173,9 @@ bool HyprlandIPC::waitForEvent(const std::function<bool(const std::string&)>& pr
 }
 
 bool HyprlandIPC::moveWindow(const std::string& address, int x, int y, int timeout_ms) {
-    std::string cmd = "/dispatch movewindowpixel exact " + std::to_string(x) + " " + 
-                      std::to_string(y) + ",address:0x" + address;
+    std::string cmd = "/dispatch hl.dsp.window.move({x=" + std::to_string(x) + ", y=" +
+                      std::to_string(y) +
+                      ", relative=false, window='address:0x" + address + "'})";
     
     spdlog::debug("[HyprIPC] Moving window {} to ({},{})", address, x, y);
     
@@ -210,8 +211,9 @@ bool HyprlandIPC::moveWindow(const std::string& address, int x, int y, int timeo
 }
 
 bool HyprlandIPC::resizeWindow(const std::string& address, int w, int h, int timeout_ms) {
-    std::string cmd = "/dispatch resizewindowpixel exact " + std::to_string(w) + " " + 
-                      std::to_string(h) + ",address:0x" + address;
+    std::string cmd = "/dispatch hl.dsp.window.resize({x=" + std::to_string(w) + ", y=" +
+                      std::to_string(h) +
+                      ", relative=false, window='address:0x" + address + "'})";
     
     spdlog::debug("[HyprIPC] Resizing window {} to {}x{}", address, w, h);
     
@@ -247,7 +249,8 @@ bool HyprlandIPC::resizeWindow(const std::string& address, int w, int h, int tim
 }
 
 bool HyprlandIPC::moveToWorkspace(const std::string& address, const std::string& workspace, int timeout_ms) {
-    std::string cmd = "/dispatch movetoworkspacesilent " + workspace + ",address:0x" + address;
+    std::string cmd = "/dispatch hl.dsp.window.move({workspace='" + workspace +
+                      "', window='address:0x" + address + "', follow=false})";
     
     spdlog::debug("[HyprIPC] Moving window {} to workspace {}", address, workspace);
     

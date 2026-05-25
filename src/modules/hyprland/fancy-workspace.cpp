@@ -230,21 +230,23 @@ bool FancyWorkspace::handleClicked(GdkEventButton* bt) const {
         
         if (id() > 0) {  // normal
           if (m_workspaceManager.moveToMonitor()) {
-            m_ipc.getSocket1Reply("dispatch focusworkspaceoncurrentmonitor " +
-                                  std::to_string(id()));
+            m_ipc.getSocket1Reply("dispatch hl.dsp.focus({workspace='" + std::to_string(id()) +
+                                  "', on_current_monitor=true})");
           } else {
-            m_ipc.getSocket1Reply("dispatch workspace " + std::to_string(id()));
+            m_ipc.getSocket1Reply("dispatch hl.dsp.focus({workspace='" + std::to_string(id()) +
+                                  "'})");
           }
         } else if (!isSpecial()) {  // named (this includes persistent)
           if (m_workspaceManager.moveToMonitor()) {
-            m_ipc.getSocket1Reply("dispatch focusworkspaceoncurrentmonitor name:" + name());
+            m_ipc.getSocket1Reply("dispatch hl.dsp.focus({workspace='name:" + name() +
+                                  "', on_current_monitor=true})");
           } else {
-            m_ipc.getSocket1Reply("dispatch workspace name:" + name());
+            m_ipc.getSocket1Reply("dispatch hl.dsp.focus({workspace='name:" + name() + "'})");
           }
         } else if (id() != -99) {  // named special
-          m_ipc.getSocket1Reply("dispatch togglespecialworkspace " + name());
+          m_ipc.getSocket1Reply("dispatch hl.dsp.workspace.toggle_special('" + name() + "')");
         } else {  // special
-          m_ipc.getSocket1Reply("dispatch togglespecialworkspace");
+          m_ipc.getSocket1Reply("dispatch hl.dsp.workspace.toggle_special()");
         }
         return true;
       }
@@ -596,7 +598,7 @@ void FancyWorkspace::updateWindowIcons() {
             if (event->button == 1) {  // Left click
               spdlog::debug("[WICONS] Icon clicked, focusing window: {}", firstWindowAddress);
               std::string response = m_workspaceManager.getIpc().getSocket1Reply(
-                  "dispatch focuswindow address:0x" + firstWindowAddress);
+                  "dispatch hl.dsp.focus({window='address:0x" + firstWindowAddress + "'})");
               if (response.find("ok") == std::string::npos && !response.empty()) {
                 spdlog::debug("[WICONS] Hyprland response: '{}'", response);
               }

@@ -73,7 +73,7 @@ TARGET_WS="${WS_ARRAY[$NEW_INDEX]}"
 
 # Switch to workspace or move window
 if [ "$ACTION" = "move" ]; then
-    hyprctl dispatch movetoworkspace "name:$TARGET_WS"
+    hyprctl dispatch "hl.dsp.window.move({workspace='name:$TARGET_WS'})"
 else
-    hyprctl dispatch workspace "name:$TARGET_WS"
+    hyprctl dispatch "hl.dsp.focus({workspace='name:$TARGET_WS'})"
 fi

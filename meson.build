@@ -188,7 +188,7 @@ src_files = files(
     'src/util/css_reload_helper.cpp',
     'src/util/thumbnail_cache.cpp',
     'src/util/popup_daemon_manager.cpp',
-    'src/util/popup_ipc_client.cpp'
+    'src/util/popup_ipc_client.cpp',
     'src/util/transform_8bit_to_rgba.cpp'
 )
 

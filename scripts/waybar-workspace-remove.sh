@@ -38,7 +38,7 @@ fi
 echo "Removing workspace '$WORKSPACE_NAME' (id: $WORKSPACE_ID) by renaming to '$NEW_NAME'"
 
 # Rename workspace (removes persistence, hyprland will auto-delete empty non-persistent workspaces)
-hyprctl dispatch renameworkspace "$WORKSPACE_ID" "$NEW_NAME"
+hyprctl dispatch "hl.dsp.workspace.rename({workspace=$WORKSPACE_ID, name='$NEW_NAME'})"
 
 # Remove from persistent workspace list
 WORKSPACE_LIST="$HOME/.config/hypr/workspaces-list"

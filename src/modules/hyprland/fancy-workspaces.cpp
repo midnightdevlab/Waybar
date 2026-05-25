@@ -1701,7 +1701,7 @@ void FancyWorkspaces::applyProjectCollapsing() {
                 groupPrefix, workspaceName);
           }
 
-          m_ipc.getSocket1Reply("dispatch workspace name:" + workspaceName);
+          m_ipc.getSocket1Reply("dispatch hl.dsp.focus({workspace='name:" + workspaceName + "'})");
         } catch (const std::exception& e) {
           spdlog::error("Workspace group label click failed: {}", e.what());
         }
@@ -1902,7 +1902,8 @@ void FancyWorkspaces::applyProjectCollapsing() {
                 if (!targetAddress.empty()) {
                   spdlog::info("[ICON_CLICK] Icon '{}' clicked, focusing window: {}", iconName,
                                targetAddress);
-                  m_ipc.getSocket1Reply("dispatch focuswindow address:0x" + targetAddress);
+                  m_ipc.getSocket1Reply("dispatch hl.dsp.focus({window='address:0x" +
+                                        targetAddress + "'})");
                 }
               });
 
