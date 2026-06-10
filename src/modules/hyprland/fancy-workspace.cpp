@@ -379,6 +379,19 @@ void FancyWorkspace::update(const std::string& workspace_icon) {
     first_call = false;
   }
 
+  // When not in all-outputs mode, a workspace must only render on the bar of the
+  // monitor that currently hosts it. During rapid cross-monitor moves a workspace
+  // can briefly linger in another bar's list with its output() already pointing
+  // elsewhere; such a straggler is excluded from project grouping/transform
+  // (see applyProjectCollapsing) and would otherwise show its raw "{name}" button.
+  // Hide it so it disappears instead of rendering unparsed; the next update on the
+  // hosting bar shows it correctly.
+  if (!this->m_workspaceManager.allOutputs() &&
+      this->output() != this->m_workspaceManager.getBarOutput()) {
+    m_button.hide();
+    return;
+  }
+
   if (this->m_workspaceManager.persistentOnly() && !this->isPersistent()) {
     m_button.hide();
     return;

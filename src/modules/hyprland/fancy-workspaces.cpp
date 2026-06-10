@@ -98,8 +98,18 @@ void FancyWorkspaces::createWorkspace(Json::Value const& workspace_data,
       });
 
   if (workspace != m_workspaces.end()) {
-    // don't recreate workspace, but update persistency if necessary
+    // don't recreate workspace, but refresh volatile fields. Crucially update the
+    // monitor/output: a move re-creates the workspace on the destination bar, and a
+    // stale output() would exclude it from project grouping/transform and leave a
+    // raw "{name}" button visible (see applyProjectCollapsing + FancyWorkspace::update).
     const auto keys = workspace_data.getMemberNames();
+
+    if (std::ranges::find(keys, "monitor") != keys.end()) {
+      (*workspace)->setOutput(workspace_data["monitor"].asString());
+    }
+    if (std::ranges::find(keys, "windows") != keys.end()) {
+      (*workspace)->setWindows(workspace_data["windows"].asUInt());
+    }
 
     const auto* k = "persistent-rule";
     if (std::ranges::find(keys, k) != keys.end()) {
