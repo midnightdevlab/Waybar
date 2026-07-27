@@ -37,8 +37,16 @@ fi
 
 echo "Removing workspace '$WORKSPACE_NAME' (id: $WORKSPACE_ID) by renaming to '$NEW_NAME'"
 
-# Rename workspace (removes persistence, hyprland will auto-delete empty non-persistent workspaces)
-hyprctl dispatch "hl.dsp.workspace.rename({workspace=$WORKSPACE_ID, name='$NEW_NAME'})"
+# Rename workspace (removes persistence, hyprland will auto-delete empty non-persistent workspaces).
+# The 0.55 lua dispatcher resolves 'workspace' through a selector string only: a numeric id is
+# rejected with "no such workspace" (the legacy `renameworkspace <id> <name>` did accept an id).
+# hyprctl exits 0 even on that warning, so the failure has to be caught in the output.
+RENAME_OUT=$(hyprctl dispatch "hl.dsp.workspace.rename({workspace='name:$WORKSPACE_NAME', name='$NEW_NAME'})" 2>&1)
+
+if [ -n "$RENAME_OUT" ] && [ "$RENAME_OUT" != "ok" ]; then
+    echo "Rename of '$WORKSPACE_NAME' failed: $RENAME_OUT"
+    exit 1
+fi
 
 # Remove from persistent workspace list
 WORKSPACE_LIST="$HOME/.config/hypr/workspaces-list"
@@ -46,4 +54,5 @@ if [ -f "$WORKSPACE_LIST" ]; then
     sed -i "/^${WORKSPACE_NAME} /d" "$WORKSPACE_LIST"
 fi
 
-exit $?
+echo "Removed workspace '$WORKSPACE_NAME'"
+exit 0
