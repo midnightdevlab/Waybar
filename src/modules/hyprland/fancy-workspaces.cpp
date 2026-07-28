@@ -22,6 +22,14 @@
 
 namespace waybar::modules::hyprland {
 
+namespace {
+// m_urgentWindows stores addresses in the 0x-prefixed form used by `hyprctl clients`,
+// while IPC event payloads and WindowInfo carry the bare form.
+std::string withAddressPrefix(std::string const& address) {
+  return address.starts_with("0x") ? address : "0x" + address;
+}
+}  // namespace
+
 FancyWorkspaces::FancyWorkspaces(const std::string& id, const Bar& bar, const Json::Value& config)
     : AModule(config, "workspaces", id, false, false),
       m_bar(bar),
@@ -679,6 +687,11 @@ void FancyWorkspaces::onActiveWindowChanged(WindowAddress const& activeWindowAdd
   spdlog::debug("[THUMBNAIL] Active window changed: {}", activeWindowAddress);
   m_currentActiveWindowAddress = activeWindowAddress;
 
+  // Focusing a window is what "I have seen it" actually means, so it is the event that must
+  // clear urgency. Doing it here also keeps the clear as global as the insert: every bar gets
+  // activewindowv2, so every bar drops the address from its own set.
+  clearWindowUrgency(activeWindowAddress);
+
   // Capture thumbnail of the newly active window (async)
   if (m_showThumbnails && !activeWindowAddress.empty() && m_thumbnailCache.isAvailable()) {
     spdlog::debug("[THUMBNAIL] Starting capture process for {}", activeWindowAddress);
@@ -1143,6 +1156,27 @@ void FancyWorkspaces::sortWorkspaces() {
   }
 }
 
+void FancyWorkspaces::clearWindowUrgency(std::string const& windowAddress) {
+  if (windowAddress.empty() || m_urgentWindows.erase(withAddressPrefix(windowAddress)) == 0) {
+    return;
+  }
+  spdlog::debug("[ICON_URGENT] Window {} was seen, urgency cleared", windowAddress);
+
+  // A workspace stays urgent only while one of its own windows still is. Recomputing here
+  // rather than trusting the flag matters because setUrgentWorkspace() only ever sets it on
+  // the bar that owns the workspace, while every bar inserts into its own m_urgentWindows.
+  for (auto& workspace : m_workspaces) {
+    if (!workspace->isUrgent()) continue;
+    auto windows = getWorkspaceWindows(workspace.get());
+    bool stillUrgent = std::ranges::any_of(windows, [this](WindowInfo const& w) {
+      return m_urgentWindows.contains(withAddressPrefix(w.windowAddress));
+    });
+    if (!stillUrgent) {
+      workspace->setUrgent(false);
+    }
+  }
+}
+
 void FancyWorkspaces::setUrgentWorkspace(std::string const& windowaddress) {
   const Json::Value clientsJson = m_ipc.getSocket1JsonReply("clients");
   int workspaceId = -1;
@@ -1253,43 +1287,24 @@ void FancyWorkspaces::updateWorkspaceStates() {
         (workspace->isSpecial() && workspace->name() == m_activeSpecialWorkspaceName));
     
     if (workspace->isActive()) {
-      spdlog::debug("Workspace {} is now active, urgent={}", workspace->name(), workspace->isUrgent());
-    }
-    
-    if (workspace->isActive() && workspace->isUrgent()) {
-      spdlog::debug("Clearing urgent for workspace {}", workspace->name());
-      workspace->setUrgent(false);
-      // Clear urgent windows for this workspace
-      auto wsWindows = getWorkspaceWindows(workspace.get());
-      for (const auto& window : wsWindows) {
-        // Ensure address has 0x prefix to match what was stored
-        std::string addr = window.windowAddress;
-        if (!addr.starts_with("0x")) {
-          addr = "0x" + addr;
-        }
-        spdlog::debug("Clearing urgent window: {}", addr);
-        auto erased = m_urgentWindows.erase(addr);
-        spdlog::debug("Erased {} (was {}present)", addr, erased ? "" : "NOT ");
-      }
-      spdlog::debug("Urgent windows remaining: {}", m_urgentWindows.size());
-      
-      // Clear urgent class from collapsed group icon buttons
-      for (auto& [iconBtn, addresses] : m_iconButtonAddresses) {
-        // Check if this icon has the urgent class
-        auto styleContext = iconBtn->get_style_context();
-        if (styleContext->has_class("urgent")) {
-          // Check if any of this icon's windows are still urgent
-          bool stillHasUrgent = std::ranges::any_of(addresses, [this](const std::string& addr) {
-            return m_urgentWindows.contains("0x" + addr);
-          });
-          
-          if (!stillHasUrgent) {
-            spdlog::debug("[ICON_URGENT] Clearing urgent from icon with addresses count: {}", addresses.size());
-            styleContext->remove_class("urgent");
-          }
+      // Switching to a workspace counts as seeing the windows on it. The address erase is
+      // deliberately NOT gated on workspace->isUrgent(): that flag is only ever set on the bar
+      // owning the workspace (see setUrgentWorkspace), whereas the urgent event populates
+      // m_urgentWindows on every bar -- gating here stranded entries on the other bars, which
+      // then rendered as permanently urgent collapsed-group icons.
+      for (const auto& window : getWorkspaceWindows(workspace.get())) {
+        if (m_urgentWindows.erase(withAddressPrefix(window.windowAddress)) > 0) {
+          spdlog::debug("[ICON_URGENT] Cleared urgent window {} on workspace {} activation",
+                        window.windowAddress, workspace->name());
         }
       }
+      if (workspace->isUrgent()) {
+        workspace->setUrgent(false);
+      }
     }
+    // The collapsed-group icons need no explicit sweep here: applyProjectCollapsing() runs
+    // right after this in doUpdate() and re-derives every icon's urgent class from
+    // m_urgentWindows.
     workspace->setVisible(std::ranges::find(visibleWorkspaces, workspace->id()) !=
                           visibleWorkspaces.end());
     std::string& workspaceIcon = m_iconsMap[""];
@@ -1642,9 +1657,6 @@ void FancyWorkspaces::applyProjectCollapsing() {
     m_box.remove(*btn);
   }
   m_labelButtons.clear();
-  
-  // Clear old icon button tracking
-  m_iconButtonAddresses.clear();
 
   // Apply collapsing/transform logic
   // Track position offset as groups add elements
@@ -1898,9 +1910,6 @@ void FancyWorkspaces::applyProjectCollapsing() {
           } else {
             iconBtn->get_style_context()->remove_class("urgent");
           }
-          
-          // Track icon button with its window addresses for urgent clearing
-          m_iconButtonAddresses[iconBtn] = iconAddresses;
 
           // Add click handler for icon - smart window focus
           std::vector<std::string> allAddresses = iconToAddresses[iconName];
