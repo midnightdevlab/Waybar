@@ -3,7 +3,7 @@
 # Installs into the canonical Arch paths and replaces extra/waybar via pacman.
 
 pkgname=waybar-custom
-pkgver=0.15.0.r4620.2e58c7cd
+pkgver=0.15.0.r4622.bc33da81
 pkgrel=1
 pkgdesc="Waybar — roby's fork with named-persistent workspace groups (Hyprland)"
 arch=('x86_64')
