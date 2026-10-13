@@ -37,6 +37,17 @@ fi
 
 echo "Removing workspace '$WORKSPACE_NAME' (id: $WORKSPACE_ID) by renaming to '$NEW_NAME'"
 
+# display.lua gives every dot workspace an explicit persistent rule; left in place it would
+# re-create the workspace right after the rename. Without the rule the empty workspace may
+# already be destroyed here, which is the goal.
+hyprctl eval "if persist_forget then persist_forget('$WORKSPACE_NAME') end" >/dev/null 2>&1
+sleep 0.2
+if ! hyprctl workspaces -j | jq -e --arg n "$WORKSPACE_NAME" 'any(.[]; .name == $n)' >/dev/null; then
+    sed -i "/^${WORKSPACE_NAME} /d" "$HOME/.config/hypr/workspaces-list" 2>/dev/null
+    echo "Removed workspace '$WORKSPACE_NAME'"
+    exit 0
+fi
+
 # Rename workspace (removes persistence, hyprland will auto-delete empty non-persistent workspaces).
 # The 0.55 lua dispatcher resolves 'workspace' through a selector string only: a numeric id is
 # rejected with "no such workspace" (the legacy `renameworkspace <id> <name>` did accept an id).
